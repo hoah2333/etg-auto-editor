@@ -188,15 +188,39 @@ def add_args(key: str, item: dict[str, str], label: str):
 
     return (
         (
-            re.sub(r"%[0-9]{2}", "-", "\n" + f"| {label} = {value}")
-            .replace("\r\n", "\n")
-            .replace("自动的", "自动")
-            .replace("-.", ".")
+            re.sub(r"%[0-9]{2}", "-", "\n" + f"| {label} = {info_note(str(value))}")
         )
         if (value := item.get(key, "")) != ""
         else ""
     )
 
+def info_note(text: str | None) -> str:
+    if text is None:
+        return ""
+
+    text = re.sub(r"(\r\n)+", "\n", text)
+    text = text.replace("自动的", "自动")
+    text = text.replace("-.", ".")
+    for string in re.findall(r"\{\{(.*?)\}\}", text):
+        if len(groups := re.split(r":", string)) != 2:
+            continue
+
+        file = groups[0].lower()
+        data = eval(f"{file}['{groups[1].replace("'", "\\'")}']")
+        name = data["locale"].get("name", data["name"])
+
+        if groups[0] == "ROOM" and groups[1] == "Secret Room":
+            groups[1] = "Secret Rooms"
+
+        if groups[0] == "PICKUP":
+            repl = f"[/pickups#{to_unix(groups[1])} {name}]"
+        elif groups[0] == "QUALITY":
+            repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
+        else:
+            repl = f"[/{to_unix(groups[1])} {name}]"
+
+        text = text.replace("{{" + string + "}}", repl)
+    return text
 
 def to_unix(string: str) -> str:
     return re.sub(r"[\.'! ]", "-", string.lower()).replace("--", "-").strip("-")
@@ -310,6 +334,7 @@ def add_one(target: dict):
         + add_args("force", target, "force")
         + add_args("spread", target, "spread")
         + add_args("sell", target, "sell")
+        + add_args("unlock", locale, "unlock")
         + "\n]]\n"
         + note(locale.get("notes", locale.get("tips")))
         + synergies(target.get("synergies"))
@@ -350,6 +375,7 @@ def add_loop(table: dict):
             + add_args("force", target, "force")
             + add_args("spread", target, "spread")
             + add_args("sell", target, "sell")
+            + add_args("unlock", locale, "unlock")
             + "\n]]\n"
             + note(locale.get("notes", locale.get("tips")))
             + synergies(target.get("synergies"))
@@ -386,7 +412,7 @@ if __name__ == "__main__":
     """
     添加某文件中的某个键的内容
     """
-    add_one(gun["Cold 45"])
+    add_one(gun["Elephant Gun"])
 
     """
     循环添加整个文件中的内容
