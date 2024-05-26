@@ -1,4 +1,5 @@
 import json
+import os
 import re
 import wikidot
 import logging
@@ -17,63 +18,26 @@ with open("./logininfo.json", "r", encoding="utf-8") as f:
 wd = wikidot.Client(logininfo["username"], logininfo["password"])
 site = wd.site.get("etg-xd")
 logger.info("登录成功")
+data_dic: dict[str, dict] = {}
+percent = re.compile(r"%[0-9]{2}")
+links: dict[str, list[str]] = {}
 
-with open("./data/gun.js", "r", encoding="utf-8") as f:
-    gun: dict = json.loads(f.read()[17:])
-
-with open("./data/gungeoneer.js", "r", encoding="utf-8") as f:
-    gungeoneer: dict = json.loads(f.read()[17:])
-
-with open("./data/room.js", "r", encoding="utf-8") as f:
-    room: dict = json.loads(f.read()[17:])
-
-with open("./data/system.js", "r", encoding="utf-8") as f:
-    system: dict = json.loads(f.read()[17:])
-
-with open("./data/synergy.js", "r", encoding="utf-8") as f:
-    synergy: dict = json.loads(f.read()[17:])
-
-with open("./data/item.js", "r", encoding="utf-8") as f:
-    item: dict = json.loads(f.read()[17:])
-
-with open("./data/shrine.js", "r", encoding="utf-8") as f:
-    shrine: dict = json.loads(f.read()[17:])
-
-with open("./data/pickup.js", "r", encoding="utf-8") as f:
-    pickup: dict = json.loads(f.read()[17:])
-
-with open("./data/quality.js", "r", encoding="utf-8") as f:
-    quality: dict = json.loads(f.read()[17:])
-
-with open("./data/chest.js", "r", encoding="utf-8") as f:
-    chest: dict = json.loads(f.read()[17:])
-
-with open("./data/enemy.js", "r", encoding="utf-8") as f:
-    enemy: dict = json.loads(f.read()[17:])
-
-with open("./data/npc.js", "r", encoding="utf-8") as f:
-    npc: dict = json.loads(f.read()[17:])
-
-with open("./data/game-mode.js", "r", encoding="utf-8") as f:
-    game_mode: dict = json.loads(f.read()[17:])
-
-with open("./data/boss.js", "r", encoding="utf-8") as f:
-    boss: dict = json.loads(f.read()[17:])
-
-with open("./data/chamber.js", "r", encoding="utf-8") as f:
-    chamber: dict = json.loads(f.read()[17:])
-
-with open("./data/page.js", "r", encoding="utf-8") as f:
-    page: dict = json.loads(f.read()[17:])
+for file in os.listdir("./data"):
+    if ".js" in file and file not in ["conf.js"]:
+        with open(f"./data/{file}", "r", encoding="utf-8") as f:
+            data_dic[file.replace(".js", "").replace("-", "_")] = json.loads(
+                f.read()[17:]
+            )
 
 
 def create_page(title: str, unix_name: str, source: str, tags: str):
-    if unix_name == "synergy":
-        unix_name = "synergies"
-    if unix_name == "pickup":
-        unix_name = "pickups"
-    if unix_name == "achievement":
-        unix_name = "achievements"
+    match unix_name:
+        case "synergy":
+            unix_name = "synergies"
+        case "pickup":
+            unix_name = "pickups"
+        case "achievement":
+            unix_name = "achievements"
     for _ in range(1, 5):
         try:
             page_id = site.page.get(unix_name)
@@ -182,31 +146,28 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
             break
 
 
-def add_args(key: str, item: dict[str, str], label: str):
-    if key == "name" and item["locale"].get(key) is not None:
+def add_args(key: str, item: dict[str, str], label: str) -> str:
+    if key == "name" and "locale" in item and key in item["locale"]:
         item = item["locale"]
 
     return (
-        (
-            re.sub(r"%[0-9]{2}", "-", "\n" + f"| {label} = {info_note(str(value))}")
-        )
+        (percent.sub("-", "\n" + f"| {label} = {info_note(str(value))}"))
         if (value := item.get(key, "")) != ""
         else ""
     )
+
 
 def info_note(text: str | None) -> str:
     if text is None:
         return ""
 
-    text = re.sub(r"(\r\n)+", "\n", text)
-    text = text.replace("自动的", "自动")
-    text = text.replace("-.", ".")
+    text = re.sub(r"(\r\n)+", "\n", text.replace("-.", "."))
     for string in re.findall(r"\{\{(.*?)\}\}", text):
         if len(groups := re.split(r":", string)) != 2:
             continue
 
         file = groups[0].lower()
-        data = eval(f"{file}['{groups[1].replace("'", "\\'")}']")
+        data = data_dic[file][groups[1]]
         name = data["locale"].get("name", data["name"])
 
         if groups[0] == "ROOM" and groups[1] == "Secret Room":
@@ -222,8 +183,9 @@ def info_note(text: str | None) -> str:
         text = text.replace("{{" + string + "}}", repl)
     return text
 
+
 def to_unix(string: str) -> str:
-    return re.sub(r"[\.'! ]", "-", string.lower()).replace("--", "-").strip("-")
+    return re.sub(r"[.'! ]+", "-", string.lower()).strip("-")
 
 
 def synergies(targets: list | None) -> str:
@@ -232,8 +194,8 @@ def synergies(targets: list | None) -> str:
 
     text = "\n\n++ 组合"
     for target in targets:
-        info = synergy[target]["locale"]
-        text += f"\n* [[[synergies#{to_unix(target)}|{info.get("name", synergy[target]["name"])}]]]：{note(info["tips"].replace("\r\n", " _\n"))}"
+        info: dict = data_dic["synergy"][target]["locale"]
+        text += f"\n* [/synergies#{to_unix(target)} {info.get("name", data_dic["synergy"][target]["name"])}]：{note(info["tips"].replace("\r\n", " _\n"))}"
 
     return text
 
@@ -242,42 +204,21 @@ def note(text: str | None) -> str:
     if text is None:
         return ""
 
-    text = re.sub(r"(\r\n)+", "\n", text)
-    text = text.replace("\n- ", "\n* ")
-    text = text.replace("<br/>", "\n")
-    for string in re.findall(r"\{\{(.*?)\}\}", text):
-        if len(groups := re.split(r":", string)) != 2:
-            continue
-
-        file = groups[0].lower()
-        data = eval(f"{file}['{groups[1].replace("'", "\\'")}']")
-        name = data["locale"].get("name", data["name"])
-
-        if groups[0] == "ROOM" and groups[1] == "Secret Room":
-            groups[1] = "Secret Rooms"
-
-        if groups[0] == "PICKUP":
-            repl = f"[[[pickups#{to_unix(groups[1])}|{name}]]]"
-        elif groups[0] == "QUALITY":
-            repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
-        else:
-            repl = f"[[[{to_unix(groups[1])}|{name}]]]"
-
-        text = text.replace("{{" + string + "}}", repl)
+    text = info_note(text.replace("<br/>", "\n").replace("\n- ", "\n* "))
 
     for string in re.findall(r"<h\d>.*?</h\d>", text):
         num = int(string[2])
 
         text = text.replace(string, f"{'+'*num} {string[4:-5]}")
 
-    for string in re.findall(r"\[\(~+(.*?)\)\]", text):
-        text = re.sub(
-            r"\[\(~+(.*?)\)\]",
+    patt = re.compile(r"\[\(~+(.*?)\)\]")
+    for string in patt.findall(text):
+        text = patt.sub(
             f"[[image https://7bye.com/hoah/i/etg/{string}]]",
             text,
             1,
         )
-        text = re.sub(r"%[0-9]{2}", "-", text).replace("-.", ".")
+        text = percent.sub("-", text).replace("-.", ".")
 
     for string in re.findall(r"\{(.*?)\}", text):
         text = text.replace("{" + string + "}", f"**{string}**")
@@ -285,7 +226,8 @@ def note(text: str | None) -> str:
     for string in re.findall(r"\(\((.*?)\)\)", text):
         text = text.replace(f"(({string}))", "{{" + string + "}}")
 
-    for string in re.findall(r"<view.*?>(.*?)</view>", text):
+    patt = re.compile(r"<view.*?>(.*?)</view>")
+    for string in patt.findall(text):
         data = eval(string)
         repl = ""
         for line in data:
@@ -295,7 +237,14 @@ def note(text: str | None) -> str:
                 unit = unit.replace("\n", " _\n")
                 repl += f"||{unit}"
             repl += "||\n"
-        text = re.sub(r"<view.*?>(.*?)</view>", repl, text, 1)
+        text = patt.sub(repl, text, 1)
+
+    patt = re.compile(r"<span(.*?)>")
+    for string in patt.findall(text):
+        text = patt.sub(f"[[span{string}]]", text, 1)
+    text = text.replace("</span>", "[[/span]]")
+
+    text = text.replace("<g>", '[[span class="group"]]').replace("</g>", "[[/span]]")
 
     return text
 
@@ -311,7 +260,7 @@ def tags_replace(types: str | None, quality: str | None) -> str:
     else:
         quality = f"枪械品质{quality}"
 
-    return f"{types.replace("自动的", "自动")} {quality} 枪械"
+    return f"{types} {quality} 枪械"
 
 
 def add_one(target: dict):
@@ -356,41 +305,7 @@ def add_loop(table: dict):
         print("", file=output, end="")
 
     for target in table:
-        locale = target["locale"]
-        source = (
-            "[[include component:infobox"
-            + add_args("name", target, "title")
-            + add_args("icon", target, "img")
-            + add_args("type", locale, "type")
-            + add_args("quality", target, "quality")
-            + add_args("magazine_size", target, "clipsize")
-            + add_args("ammo_capacity", target, "maxammo")
-            + add_args("reload_time", target, "reload")
-            + add_args("dps", target, "dps")
-            + add_args("damage", target, "damage")
-            + add_args("fire_rate", target, "firerate")
-            + add_args("shot_speed", target, "shotspeed")
-            + add_args("charge", target, "charge")
-            + add_args("range", target, "range")
-            + add_args("force", target, "force")
-            + add_args("spread", target, "spread")
-            + add_args("sell", target, "sell")
-            + add_args("unlock", locale, "unlock")
-            + "\n]]\n"
-            + note(locale.get("notes", locale.get("tips")))
-            + synergies(target.get("synergies"))
-            + "\n"
-        )
-
-        with open("./output.ftml", "at", encoding="utf-8") as output:
-            print(source, file=output, end="")
-
-        create_page(
-            target["locale"].get("name", target["name"]),
-            to_unix(target["name"]),
-            source,
-            tags_replace(target["locale"]["type"], target["quality"]),
-        )
+        add_one(target)
 
 
 def add_special(target: dict):
@@ -412,7 +327,7 @@ if __name__ == "__main__":
     """
     添加某文件中的某个键的内容
     """
-    add_one(gun["Elephant Gun"])
+    add_one(data_dic["gun"]["Blasphemy"])
 
     """
     循环添加整个文件中的内容
