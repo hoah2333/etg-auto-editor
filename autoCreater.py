@@ -158,15 +158,13 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
         else ""
     )
 
+
 def create_div_class(name: str, element: str | None) -> str:
     if element is None:
         return ""
-    
-    return (
-        f"[[div_ class=\"{name}\"]]\n"
-        + create_tips(element)
-        + "\n[[/div]]\n"
-    )
+
+    return f'[[div_ class="{name}"]]\n' + create_tips(element) + "\n[[/div]]\n"
+
 
 def create_infobox(target: dict) -> str:
     locale: dict = target["locale"]
@@ -174,6 +172,7 @@ def create_infobox(target: dict) -> str:
     return (
         "[[include component:infobox"
         + add_args("name", target, "title")
+        + (f"\n| en-title = {target["name"]}" if "name" in locale else "")
         + add_args("icon", target, "img")
         + add_args("type", locale, "type")
         + add_args("quality", target, "quality")
@@ -192,6 +191,7 @@ def create_infobox(target: dict) -> str:
         + add_args("unlock", locale, "unlock")
         + "\n]]\n"
     )
+
 
 def create_tips(text: str | None) -> str:
     if text is None:
@@ -232,20 +232,38 @@ def info_note(text: str | None) -> str:
 
 
 def to_unix(string: str) -> str:
-    return re.sub(r"[.'!& ]+", "-", string.lower()).strip("-")
+    """
+    Converts string to unix name
+
+    Params:
+        string: str - String to convert
+
+    Example:
+        >>> to_unix("Ammo Box")
+        "ammo-box"
+    """
+    return re.sub(r"[.'!&\-\\/ ]+", "-", string.lower()).strip("-")
 
 
-def create_synergy(name: str) -> str:
-    target: dict = data_dic["synergy"][name]
+def create_synergy(synergy: str, component: bool = False) -> str:
+    """
+    Creates synergy part for anypage
+
+    Params:
+        synergy: str - Name of synergy
+        component: bool (optional, False by default) - If it is used for a component page
+    """
+    target: dict = data_dic["synergy"][synergy]
 
     crafts = ""
     for index, items in enumerate(target.get("group", [])):
-        text = f"\n| craft{index+1} = "
+        text = f"\n| craft{index + 1} = "
         for item in items:
             file = item["type"].lower()
             name = item["name"]
             unix_name = to_unix(name)
-            title = data_dic[file][name]["locale"]["name"]
+            item_target = data_dic[file][name]
+            title = item_target["locale"].get("name", item_target["name"])
             if links.get(file) is None:
                 links[file] = []
             links[file].append(unix_name)
@@ -253,9 +271,10 @@ def create_synergy(name: str) -> str:
         crafts += text
 
     return (
-        "[[include component:synergy"
+        f"[[include component:{"preview-" if component else ""}synergy"
+        + (f"\n| unix = {to_unix(synergy)}" if component else "")
         + add_args("name", target, "title")
-        + f"\n| en-title = {target["name"]}"
+        + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
         + crafts
         + add_args("sprite", target, "result")
         + f"\n| tips = {create_tips(target["locale"].get("tips"))}"
@@ -334,7 +353,7 @@ def add_one(target: dict):
     infobox = create_infobox(target)
     unlock = create_div_class("unlock", locale.get("unlock"))
     trivia = create_div_class("trivia", locale.get("trivia"))
-   
+
     synergies = ""
     for synergy in target.get("synergies", []):
         synergies += create_synergy(synergy)
@@ -343,7 +362,7 @@ def add_one(target: dict):
     for file in links:
         include += f"[[include data:{file}\n"
         for unix_name in set(links[file]):
-            include += f"| {unix_name}=--]\n"
+            include += f"| {unix_name}={"]" if file == "synergy" else "--]"}\n"
         include += f"]]\n"
 
     source = include + infobox + tips + synergies + unlock + trivia
