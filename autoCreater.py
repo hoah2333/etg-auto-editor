@@ -31,6 +31,8 @@ for file in os.listdir("./data"):
 
 
 def create_page(title: str, unix_name: str, source: str, tags: str):
+    global links
+    links = {}
     match unix_name:
         case "synergy":
             unix_name = "synergies"
@@ -125,7 +127,7 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
                                 "action": "WikiPageAction",
                                 "event": "savePage",
                                 "moduleName": "Empty",
-                                "title": title,
+                                "title": page_id.title,
                                 "source": source,
                                 "mode": "page",
                                 "wiki_page": unix_name,
@@ -149,6 +151,8 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
 def add_args(key: str, item: dict[str, str], label: str) -> str:
     if key == "name" and "locale" in item and key in item["locale"]:
         item = item["locale"]
+    if key == "icon":
+        key = "local_icon" if item.get(key, "") == "" else key
 
     return (
         (percent.sub("-", "\n" + f"| {label} = {info_note(str(value))}"))
@@ -157,7 +161,15 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
     )
 
 
+def target_note(text: str | None) -> str:
+    if text is None:
+        return None
+
+    return re.sub(r"\[/(?=.*?\])", "[#u-", note(text))
+
+
 def info_note(text: str | None) -> str:
+    global links
     if text is None:
         return ""
 
@@ -170,22 +182,25 @@ def info_note(text: str | None) -> str:
         data = data_dic[file][groups[1]]
         name = data["locale"].get("name", data["name"])
 
-        if groups[0] == "ROOM" and groups[1] == "Secret Room":
-            groups[1] = "Secret Rooms"
+        unix_name = to_unix(groups[1])
+
+        if links.get(file) is None:
+            links[file] = []
+        links[file].append(unix_name)
 
         if groups[0] == "PICKUP":
-            repl = f"[/pickups#{to_unix(groups[1])} {name}]"
+            repl = f"[/pickups#{unix_name} {name}]"
         elif groups[0] == "QUALITY":
             repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
         else:
-            repl = f"[/{to_unix(groups[1])} {name}]"
+            repl = f"[/{unix_name} {name}]"
 
         text = text.replace("{{" + string + "}}", repl)
     return text
 
 
 def to_unix(string: str) -> str:
-    return re.sub(r"[.'! ]+", "-", string.lower()).strip("-")
+    return re.sub(r"[.'!& ]+", "-", string.lower()).strip("-")
 
 
 def synergies(targets: list | None) -> str:
@@ -241,7 +256,7 @@ def note(text: str | None) -> str:
 
     patt = re.compile(r"<span(.*?)>")
     for string in patt.findall(text):
-        text = patt.sub(f"[[span{string}]]", text, 1)
+        text = patt.sub(f"[[span{string.replace("'", "\"")}]]", text, 1)
     text = text.replace("</span>", "[[/span]]")
 
     text = text.replace("<g>", '[[span class="group"]]').replace("</g>", "[[/span]]")
@@ -264,6 +279,7 @@ def tags_replace(types: str | None, quality: str | None) -> str:
 
 
 def add_one(target: dict):
+    global links
     locale = target["locale"]
     source = (
         "[[include component:infobox"
@@ -285,9 +301,18 @@ def add_one(target: dict):
         + add_args("sell", target, "sell")
         + add_args("unlock", locale, "unlock")
         + "\n]]\n"
-        + note(locale.get("notes", locale.get("tips")))
+        + target_note(locale.get("notes", locale.get("tips")))
         + synergies(target.get("synergies"))
     )
+
+    include = ""
+    for file in links:
+        include += f"[[include data:{file}\n"
+        for unix_name in set(links[file]):
+            include += f"| {unix_name}=--]\n"
+        include += f"]]\n"
+
+    source = include + source
 
     with open("./output.ftml", "w", encoding="utf-8") as output:
         print(source, file=output, end="")
