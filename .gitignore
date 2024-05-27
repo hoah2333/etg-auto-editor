@@ -1,3 +1,4 @@
 .vscode/
 data/
 output.ftml
+generate gun.py

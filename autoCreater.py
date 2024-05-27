@@ -31,8 +31,6 @@ for file in os.listdir("./data"):
 
 
 def create_page(title: str, unix_name: str, source: str, tags: str):
-    global links
-    links = {}
     match unix_name:
         case "synergy":
             unix_name = "synergies"
@@ -160,12 +158,46 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
         else ""
     )
 
+def create_div_class(name: str, element: str | None) -> str:
+    if element is None:
+        return ""
+    
+    return (
+        f"[[div_ class=\"{name}\"]]\n"
+        + create_tips(element)
+        + "\n[[/div]]\n"
+    )
 
-def target_note(text: str | None) -> str:
+def create_infobox(target: dict) -> str:
+    locale: dict = target["locale"]
+
+    return (
+        "[[include component:infobox"
+        + add_args("name", target, "title")
+        + add_args("icon", target, "img")
+        + add_args("type", locale, "type")
+        + add_args("quality", target, "quality")
+        + add_args("magazine_size", target, "clipsize")
+        + add_args("ammo_capacity", target, "maxammo")
+        + add_args("reload_time", target, "reload")
+        + add_args("dps", target, "dps")
+        + add_args("damage", target, "damage")
+        + add_args("fire_rate", target, "firerate")
+        + add_args("shot_speed", target, "shotspeed")
+        + add_args("charge", target, "charge")
+        + add_args("range", target, "range")
+        + add_args("force", target, "force")
+        + add_args("spread", target, "spread")
+        + add_args("sell", target, "sell")
+        + add_args("unlock", locale, "unlock")
+        + "\n]]\n"
+    )
+
+def create_tips(text: str | None) -> str:
     if text is None:
         return None
 
-    return re.sub(r"\[/(?=.*?\])", "[#u-", note(text))
+    return re.sub(r"\[/(?=.*?\])", "[#u-", note(text)).replace("pickups#", "")
 
 
 def info_note(text: str | None) -> str:
@@ -203,16 +235,32 @@ def to_unix(string: str) -> str:
     return re.sub(r"[.'!& ]+", "-", string.lower()).strip("-")
 
 
-def synergies(targets: list | None) -> str:
-    if targets is None:
-        return ""
+def create_synergy(name: str) -> str:
+    target: dict = data_dic["synergy"][name]
 
-    text = "\n\n++ 组合"
-    for target in targets:
-        info: dict = data_dic["synergy"][target]["locale"]
-        text += f"\n* [/synergies#{to_unix(target)} {info.get("name", data_dic["synergy"][target]["name"])}]：{note(info["tips"].replace("\r\n", " _\n"))}"
+    crafts = ""
+    for index, items in enumerate(target.get("group", [])):
+        text = f"\n| craft{index+1} = "
+        for item in items:
+            file = item["type"].lower()
+            name = item["name"]
+            unix_name = to_unix(name)
+            title = data_dic[file][name]["locale"]["name"]
+            if links.get(file) is None:
+                links[file] = []
+            links[file].append(unix_name)
+            text += f"[#u-{unix_name} {title}] "
+        crafts += text
 
-    return text
+    return (
+        "[[include component:synergy"
+        + add_args("name", target, "title")
+        + f"\n| en-title = {target["name"]}"
+        + crafts
+        + add_args("sprite", target, "result")
+        + f"\n| tips = {create_tips(target["locale"].get("tips"))}"
+        "\n]]\n"
+    )
 
 
 def note(text: str | None) -> str:
@@ -280,30 +328,16 @@ def tags_replace(types: str | None, quality: str | None) -> str:
 
 def add_one(target: dict):
     global links
-    locale = target["locale"]
-    source = (
-        "[[include component:infobox"
-        + add_args("name", target, "title")
-        + add_args("icon", target, "img")
-        + add_args("type", locale, "type")
-        + add_args("quality", target, "quality")
-        + add_args("magazine_size", target, "clipsize")
-        + add_args("ammo_capacity", target, "maxammo")
-        + add_args("reload_time", target, "reload")
-        + add_args("dps", target, "dps")
-        + add_args("damage", target, "damage")
-        + add_args("fire_rate", target, "firerate")
-        + add_args("shot_speed", target, "shotspeed")
-        + add_args("charge", target, "charge")
-        + add_args("range", target, "range")
-        + add_args("force", target, "force")
-        + add_args("spread", target, "spread")
-        + add_args("sell", target, "sell")
-        + add_args("unlock", locale, "unlock")
-        + "\n]]\n"
-        + target_note(locale.get("notes", locale.get("tips")))
-        + synergies(target.get("synergies"))
-    )
+    links = {}
+    locale: dict = target["locale"]
+    tips = create_tips(locale.get("notes", locale.get("tips"))) + "\n"
+    infobox = create_infobox(target)
+    unlock = create_div_class("unlock", locale.get("unlock"))
+    trivia = create_div_class("trivia", locale.get("trivia"))
+   
+    synergies = ""
+    for synergy in target.get("synergies", []):
+        synergies += create_synergy(synergy)
 
     include = ""
     for file in links:
@@ -312,7 +346,7 @@ def add_one(target: dict):
             include += f"| {unix_name}=--]\n"
         include += f"]]\n"
 
-    source = include + source
+    source = include + infobox + tips + synergies + unlock + trivia
 
     with open("./output.ftml", "w", encoding="utf-8") as output:
         print(source, file=output, end="")
@@ -352,7 +386,7 @@ if __name__ == "__main__":
     """
     添加某文件中的某个键的内容
     """
-    add_one(data_dic["gun"]["Blasphemy"])
+    add_one(data_dic["gun"]["Casey"])
 
     """
     循环添加整个文件中的内容
