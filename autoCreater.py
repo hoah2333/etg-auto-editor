@@ -20,7 +20,7 @@ site = wd.site.get("etg-xd")
 logger.info("登录成功")
 data_dic: dict[str, dict] = {}
 percent = re.compile(r"%[0-9]{2}")
-links: dict[str, list[str]] = {}
+
 
 for file in os.listdir("./data"):
     if ".js" in file and file not in ["conf.js"]:
@@ -158,17 +158,16 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
         else ""
     )
 
-def add_link(file: str, unix_name: str): -> None:
-        global links
+def add_link(file: str, unix_name: str, links: dict) -> None:
         if links.get(file) is None:
             links[file] = []
         links[file].append(unix_name)
 
-def create_div_class(name: str, element: str | None) -> str:
+def create_div_class(name: str, element: str | None, links: dict) -> str:
     if element is None:
         return ""
 
-    return f'[[div_ class="{name}"]]\n' + create_tips(element) + "\n[[/div]]\n"
+    return f'[[div_ class="{name}"]]\n' + create_tips(element, links) + "\n[[/div]]\n"
 
 
 def create_infobox(target: dict) -> str:
@@ -198,16 +197,19 @@ def create_infobox(target: dict) -> str:
     )
 
 
-def create_tips(text: str | None) -> str:
+def create_tips(text: str | None, links: dict) -> str:
     if text is None:
         return None
 
-    return re.sub(r"\[/(?=.*?\])", "[#u-", note(text)).replace("pickups#", "")
+    return re.sub(r"\[/(?=.*?\])", "[#u-", note(text, links)).replace("pickups#", "")
 
 
-def info_note(text: str | None) -> str:
+def info_note(text: str | None, links: dict | None = None) -> str:
     if text is None:
         return ""
+
+    if links is None:
+        links = {}
 
     text = re.sub(r"(\r\n)+", "\n", text.replace("-.", "."))
     for string in re.findall(r"\{\{(.*?)\}\}", text):
@@ -219,7 +221,7 @@ def info_note(text: str | None) -> str:
         name = data["locale"].get("name", data["name"])
 
         unix_name = to_unix(groups[1])
-        add_link(file, unix_name)
+        add_link(file, unix_name, links)
 
         if groups[0] == "PICKUP":
             repl = f"[/pickups#{unix_name} {name}]"
@@ -246,7 +248,7 @@ def to_unix(string: str) -> str:
     return re.sub(r"[.'!&\-\\/ ]+", "-", string.lower()).strip("-")
 
 
-def create_synergy(synergy: str, component: bool = False) -> str:
+def create_synergy(synergy: str, links:dict ,component: bool = False) -> str:
     """
     Creates synergy part for anypage
 
@@ -281,11 +283,14 @@ def create_synergy(synergy: str, component: bool = False) -> str:
     )
 
 
-def note(text: str | None) -> str:
+def note(text: str | None, links: dict | None = None) -> str:
     if text is None:
         return ""
+    
+    if links is None:
+        links = {}
 
-    text = info_note(text.replace("<br/>", "\n").replace("\n- ", "\n* "))
+    text = info_note(text.replace("<br/>", "\n").replace("\n- ", "\n* "), links)
 
     for string in re.findall(r"<h\d>.*?</h\d>", text):
         num = int(string[2])
@@ -345,17 +350,16 @@ def tags_replace(types: str | None, quality: str | None) -> str:
 
 
 def add_one(target: dict):
-    global links
-    links = {}
+    links: dict[str, list[str]] = {}
     locale: dict = target["locale"]
-    tips = create_tips(locale.get("notes", locale.get("tips"))) + "\n"
+    tips = create_tips(locale.get("notes", locale.get("tips")), links) + "\n"
     infobox = create_infobox(target)
-    unlock = create_div_class("unlock", locale.get("unlock"))
-    trivia = create_div_class("trivia", locale.get("trivia"))
+    unlock = create_div_class("unlock", locale.get("unlock"), links)
+    trivia = create_div_class("trivia", locale.get("trivia"), links)
 
     synergies = ""
     for synergy in target.get("synergies", []):
-        synergies += create_synergy(synergy)
+        synergies += create_synergy(synergy, links)
 
     include = ""
     for file in links:

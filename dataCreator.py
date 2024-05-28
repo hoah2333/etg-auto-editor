@@ -12,7 +12,7 @@ for target in file.values():
     unix_name = to_unix(target["name"])
     if filename == "synergy":
         links = {}
-        synergy = create_synergy(target["name"], True)
+        synergy = create_synergy(target["name"], links, True)
         include = ""
         for file in links:
             include += f"[[include data:{file}\n"
