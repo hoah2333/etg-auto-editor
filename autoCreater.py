@@ -158,6 +158,11 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
         else ""
     )
 
+def add_link(file: str, unix_name: str): -> None:
+        global links
+        if links.get(file) is None:
+            links[file] = []
+        links[file].append(unix_name)
 
 def create_div_class(name: str, element: str | None) -> str:
     if element is None:
@@ -201,7 +206,6 @@ def create_tips(text: str | None) -> str:
 
 
 def info_note(text: str | None) -> str:
-    global links
     if text is None:
         return ""
 
@@ -215,10 +219,7 @@ def info_note(text: str | None) -> str:
         name = data["locale"].get("name", data["name"])
 
         unix_name = to_unix(groups[1])
-
-        if links.get(file) is None:
-            links[file] = []
-        links[file].append(unix_name)
+        add_link(file, unix_name)
 
         if groups[0] == "PICKUP":
             repl = f"[/pickups#{unix_name} {name}]"
@@ -264,9 +265,7 @@ def create_synergy(synergy: str, component: bool = False) -> str:
             unix_name = to_unix(name)
             item_target = data_dic[file][name]
             title = item_target["locale"].get("name", item_target["name"])
-            if links.get(file) is None:
-                links[file] = []
-            links[file].append(unix_name)
+            add_link(file, unix_name)
             text += f"[#u-{unix_name} {title}] "
         crafts += text
 
