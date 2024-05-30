@@ -16,14 +16,15 @@ for target in file.values():
         include = ""
         for file in links:
             include += f"[[include data:{file}\n"
-            for unix_name in set(links[file]):
-                include += f"| {unix_name}={"]" if file == "synergy" else "--]"}\n"
+            for unix in set(links[file]):
+                include += f"| {unix}={"]" if file == "synergy" else "--]"}\n"
             include += f"]]\n"
         source = (
             "[[iftags +synergy]]\n"
             + f">[[/iftags{{${unix_name}}}]\n"
+            + include
             + synergy
-            + f">[[iftags{{${unix_name}}}]\n"
+            + f">[[iftags +synergy{{${unix_name}}}]\n"
             + "[[/iftags]]\n"
         )
     else:

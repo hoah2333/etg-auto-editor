@@ -70,9 +70,9 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
                         ]
                     )
                     logger.info(f"{unix_name} 已创建")
-                except Exception as e:
+                except Exception as error:
                     logger.error("创建页面失败，正在重试")
-                    logger.error(e)
+                    logger.error(error)
                     continue
                 else:
                     break
@@ -93,16 +93,16 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
                         ]
                     )
                     logger.info(f"{unix_name} 已添加标签")
-                except Exception as e:
+                except Exception as error:
                     logger.error("标签添加失败，正在重试")
-                    logger.error(e)
+                    logger.error(error)
                     continue
                 else:
                     break
             break
-        except Exception as e:
+        except Exception as error:
             logger.error(f"未知错误")
-            logger.error(e)
+            logger.error(error)
             continue
         else:
             logger.info(f"{unix_name} 已存在")
@@ -137,9 +137,9 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
                         ]
                     )
                     logger.info(f"{unix_name} 已修改内容")
-                except Exception as e:
+                except Exception as error:
                     logger.error("内容修改失败，正在重试")
-                    logger.error(e)
+                    logger.error(error)
                     continue
                 else:
                     break
@@ -158,10 +158,12 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
         else ""
     )
 
+
 def add_link(file: str, unix_name: str, links: dict) -> None:
-        if links.get(file) is None:
-            links[file] = []
-        links[file].append(unix_name)
+    if links.get(file) is None:
+        links[file] = []
+    links[file].append(unix_name)
+
 
 def create_div_class(name: str, element: str | None, links: dict) -> str:
     if element is None:
@@ -199,7 +201,7 @@ def create_infobox(target: dict) -> str:
 
 def create_tips(text: str | None, links: dict) -> str:
     if text is None:
-        return None
+        return ""
 
     return re.sub(r"\[/(?=.*?\])", "[#u-", note(text, links)).replace("pickups#", "")
 
@@ -248,7 +250,7 @@ def to_unix(string: str) -> str:
     return re.sub(r"[.'!&\-\\/ ]+", "-", string.lower()).strip("-")
 
 
-def create_synergy(synergy: str, links:dict ,component: bool = False) -> str:
+def create_synergy(synergy: str, links: dict, component: bool = False) -> str:
     """
     Creates synergy part for anypage
 
@@ -267,7 +269,7 @@ def create_synergy(synergy: str, links:dict ,component: bool = False) -> str:
             unix_name = to_unix(name)
             item_target = data_dic[file][name]
             title = item_target["locale"].get("name", item_target["name"])
-            add_link(file, unix_name)
+            add_link(file, unix_name, links)
             text += f"[#u-{unix_name} {title}] "
         crafts += text
 
@@ -278,7 +280,7 @@ def create_synergy(synergy: str, links:dict ,component: bool = False) -> str:
         + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
         + crafts
         + add_args("sprite", target, "result")
-        + f"\n| tips = {create_tips(target["locale"].get("tips"))}"
+        + f"\n| tips = {create_tips(target["locale"].get("tips"), links)}"
         "\n]]\n"
     )
 
@@ -286,7 +288,7 @@ def create_synergy(synergy: str, links:dict ,component: bool = False) -> str:
 def note(text: str | None, links: dict | None = None) -> str:
     if text is None:
         return ""
-    
+
     if links is None:
         links = {}
 
