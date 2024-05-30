@@ -247,7 +247,7 @@ def to_unix(string: str) -> str:
         >>> to_unix("Ammo Box")
         "ammo-box"
     """
-    return re.sub(r"[.'!&\-\\/ ]+", "-", string.lower()).strip("-")
+    return re.sub(r"[.'!&\-\\/\(\) ]+", "-", string.lower()).strip("-")
 
 
 def create_synergy(synergy: str, links: dict, component: bool = False) -> str:
