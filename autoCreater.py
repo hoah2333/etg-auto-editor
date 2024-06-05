@@ -343,6 +343,8 @@ def note(text: str | None, links: dict | None = None) -> str:
 
     text = text.replace("<g>", '[[span class="group"]]').replace("</g>", "[[/span]]")
 
+    text = re.sub(r"\]\]$", "]] ", text)
+
     return text
 
 
@@ -419,9 +421,9 @@ if __name__ == "__main__":
     """
     添加某文件中的某个键的内容
     """
-    add_one(data_dic["item"]["Prime Primer"])
+    # add_one(data_dic["item"]["Prime Primer"])
 
     """
     循环添加整个文件中的内容
     """
-    # add_loop(data_dic["gun"])
+    add_loop(data_dic["item"])
