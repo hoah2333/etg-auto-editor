@@ -13,19 +13,10 @@ for target in file.values():
     if filename == "synergy":
         links = {}
         synergy = create_synergy(target["name"], links, True)
-        include = ""
-        for file in links:
-            include += f"[[include data:{file}\n"
-            for unix in set(links[file]):
-                include += f"| {unix}={"]" if file == "synergy" else "--]"}\n"
-            include += f"]]\n"
         source = (
-            "[[iftags +synergy]]\n"
-            + f">[[/iftags{{${unix_name}}}]\n"
-            + include
+            f"[!-- {{${unix_name}}}\n"
             + synergy
-            + f">[[iftags +synergy{{${unix_name}}}]\n"
-            + "[[/iftags]]\n"
+            + "[!-- --]\n"
         )
     else:
         source = (

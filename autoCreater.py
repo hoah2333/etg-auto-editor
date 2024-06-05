@@ -40,7 +40,7 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
             unix_name = "achievements"
     for _ in range(1, 5):
         try:
-            page_id = site.page.get(unix_name)
+            pagedata = site.page.get(unix_name)
         except wikidot.common.exceptions.NotFoundException:
             lock = site.amc_request(
                 [
@@ -107,42 +107,46 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
         else:
             logger.info(f"{unix_name} 已存在")
 
-            lock = site.amc_request(
-                [
-                    {
-                        "mode": "page",
-                        "wiki_page": unix_name,
-                        "moduleName": "edit/PageEditModule",
-                    }
-                ]
-            )[0].json()
+            pagesource = pagedata.source.wiki_text
+            if re.sub(r"(\r|\n)", "", pagesource) != re.sub(r"(\r|\n)", "", source):
+                lock = site.amc_request(
+                    [
+                        {
+                            "mode": "page",
+                            "wiki_page": unix_name,
+                            "moduleName": "edit/PageEditModule",
+                        }
+                    ]
+                )[0].json()
 
-            for _ in range(1, 5):
-                try:
-                    site.amc_request(
-                        [
-                            {
-                                "action": "WikiPageAction",
-                                "event": "savePage",
-                                "moduleName": "Empty",
-                                "title": page_id.title,
-                                "source": source,
-                                "mode": "page",
-                                "wiki_page": unix_name,
-                                "lock_id": lock["lock_id"],
-                                "lock_secret": lock["lock_secret"],
-                                "revision_id": lock["page_revision_id"],
-                                "comments": "Data corrected by AutoCreater",
-                            }
-                        ]
-                    )
-                    logger.info(f"{unix_name} 已修改内容")
-                except Exception as error:
-                    logger.error("内容修改失败，正在重试")
-                    logger.error(error)
-                    continue
-                else:
-                    break
+                for _ in range(1, 5):
+                    try:
+                        site.amc_request(
+                            [
+                                {
+                                    "action": "WikiPageAction",
+                                    "event": "savePage",
+                                    "moduleName": "Empty",
+                                    "title": pagedata.title,
+                                    "source": source,
+                                    "mode": "page",
+                                    "wiki_page": unix_name,
+                                    "lock_id": lock["lock_id"],
+                                    "lock_secret": lock["lock_secret"],
+                                    "revision_id": lock["page_revision_id"],
+                                    "comments": "Data corrected by AutoCreater",
+                                }
+                            ]
+                        )
+                        logger.info(f"{unix_name} 已修改内容")
+                    except Exception as error:
+                        logger.error("内容修改失败，正在重试")
+                        logger.error(error)
+                        continue
+                    else:
+                        break
+            else:
+                logger.info("内容相同，跳过修改")
             break
 
 
@@ -199,11 +203,13 @@ def create_infobox(target: dict) -> str:
     )
 
 
-def create_tips(text: str | None, links: dict) -> str:
+def create_tips(text: str | None, links: dict, synergy: bool = False) -> str:
     if text is None:
         return ""
 
-    return re.sub(r"\[/(?=.*?\])", "[#u-", note(text, links)).replace("pickups#", "")
+    return re.sub(
+        r"\[/(?=.*?\])", "[/" if synergy else "[#u-", note(text, links)
+    ).replace("pickups#", "")
 
 
 def info_note(text: str | None, links: dict | None = None) -> str:
@@ -214,6 +220,7 @@ def info_note(text: str | None, links: dict | None = None) -> str:
         links = {}
 
     text = re.sub(r"(\r\n)+", "\n", text.replace("-.", "."))
+    text = text.replace("}}{{", "}} {{")
     for string in re.findall(r"\{\{(.*?)\}\}", text):
         if len(groups := re.split(r":", string)) != 2:
             continue
@@ -270,7 +277,7 @@ def create_synergy(synergy: str, links: dict, component: bool = False) -> str:
             item_target = data_dic[file][name]
             title = item_target["locale"].get("name", item_target["name"])
             add_link(file, unix_name, links)
-            text += f"[#u-{unix_name} {title}] "
+            text += f"[{"/" if component else "#u-"}{unix_name} {title}] "
         crafts += text
 
     return (
@@ -280,7 +287,7 @@ def create_synergy(synergy: str, links: dict, component: bool = False) -> str:
         + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
         + crafts
         + add_args("sprite", target, "result")
-        + f"\n| tips = {create_tips(target["locale"].get("tips"), links)}"
+        + f"\n| tips = {create_tips(target["locale"].get("tips"), links, component)}"
         "\n]]\n"
     )
 
@@ -367,7 +374,7 @@ def add_one(target: dict):
     for file in links:
         include += f"[[include data:{file}\n"
         for unix_name in set(links[file]):
-            include += f"| {unix_name}={"]" if file == "synergy" else "--]"}\n"
+            include += f"| {unix_name} = --]\n"
         include += f"]]\n"
 
     source = include + infobox + tips + synergies + unlock + trivia
@@ -387,7 +394,7 @@ def add_loop(table: dict):
     with open("./output.ftml", "w", encoding="utf-8") as output:
         print("", file=output, end="")
 
-    for target in table:
+    for target in table.values():
         add_one(target)
 
 
@@ -410,9 +417,9 @@ if __name__ == "__main__":
     """
     添加某文件中的某个键的内容
     """
-    add_one(data_dic["gun"]["Casey"])
+    # add_one(data_dic["gun"]["Rusty Sidearm"])
 
     """
     循环添加整个文件中的内容
     """
-    # add_loop(gun.values())
+    add_loop(data_dic["gun"])
