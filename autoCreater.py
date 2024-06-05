@@ -157,7 +157,7 @@ def add_args(key: str, item: dict[str, str], label: str) -> str:
         key = "local_icon" if item.get(key, "") == "" else key
 
     return (
-        (percent.sub("-", "\n" + f"| {label} = {info_note(str(value))}"))
+        (percent.sub("-", "\n" + f"| {label} = {note(str(value), isInfo=True)}"))
         if (value := item.get(key, "")) != ""
         else ""
     )
@@ -211,38 +211,6 @@ def create_tips(text: str | None, links: dict, synergy: bool = False) -> str:
         r"\[/(?=.*?\])", "[/" if synergy else "[#u-", note(text, links)
     ).replace("pickups#", "")
 
-
-def info_note(text: str | None, links: dict | None = None) -> str:
-    if text is None:
-        return ""
-
-    if links is None:
-        links = {}
-
-    text = re.sub(r"(\r\n)+", "\n", text.replace("-.", "."))
-    text = text.replace("}}{{", "}} {{")
-    for string in re.findall(r"\{\{(.*?)\}\}", text):
-        if len(groups := re.split(r":", string)) != 2:
-            continue
-
-        file = groups[0].lower()
-        data = data_dic[file][groups[1]]
-        name = data["locale"].get("name", data["name"])
-
-        unix_name = to_unix(groups[1])
-        add_link(file, unix_name, links)
-
-        if groups[0] == "PICKUP":
-            repl = f"[/pickups#{unix_name} {name}]"
-        elif groups[0] == "QUALITY":
-            repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
-        else:
-            repl = f"[/{unix_name} {name}]"
-
-        text = text.replace("{{" + string + "}}", repl)
-    return text
-
-
 def to_unix(string: str) -> str:
     """
     Converts string to unix name
@@ -292,36 +260,54 @@ def create_synergy(synergy: str, links: dict, component: bool = False) -> str:
     )
 
 
-def note(text: str | None, links: dict | None = None) -> str:
+def note(text: str | None, links: dict | None = None, isInfo: bool = False) -> str:
     if text is None:
         return ""
 
     if links is None:
         links = {}
+    
+    text = text.replace("<br/>", "\n").replace("\n- ", "\n* ")
+    text = re.sub(r"(\r\n)+", "\n", text.replace("-.", "."))
+    text = text.replace("}}{{", "}} {{")
+    for string in re.findall(r"\{\{(.*?)\}\}", text):
+        if len(groups := re.split(r":", string)) != 2:
+            continue
 
-    text = info_note(text.replace("<br/>", "\n").replace("\n- ", "\n* "), links)
+        file = groups[0].lower()
+        data = data_dic[file][groups[1]]
+        name = data["locale"].get("name", data["name"])
+
+        unix_name = to_unix(groups[1])
+        add_link(file, unix_name, links)
+
+        if groups[0] == "PICKUP":
+            repl = f"[/pickups#{unix_name} {name}]"
+        elif groups[0] == "QUALITY":
+            repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
+        else:
+            repl = f"[/{unix_name} {name}]"
+
+        text = text.replace("{{" + string + "}}", repl)
 
     text = re.sub(r"(\| \w+ = )\- ", r"\1* ", text)
+
+    if isInfo:
+        return text
 
     for string in re.findall(r"<h\d>.*?</h\d>", text):
         num = int(string[2])
 
         text = text.replace(string, f"{'+'*num} {string[4:-5]}")
 
-    patt = re.compile(r"\[\(~+(.*?)\)\]")
-    for string in patt.findall(text):
-        text = patt.sub(
-            f"[[image https://7bye.com/hoah/i/etg/{string}]]",
-            text,
-            1,
+    text = re.sub(r"\[\(~+(.*?)\)\]",
+            r"[[image https://7bye.com/hoah/i/etg/\1]]",
+            text
         )
-        text = percent.sub("-", text).replace("-.", ".")
+    text = percent.sub("-", text).replace("-.", ".")
 
-    for string in re.findall(r"\{(.*?)\}", text):
-        text = text.replace("{" + string + "}", f"**{string}**")
-
-    for string in re.findall(r"\(\((.*?)\)\)", text):
-        text = text.replace(f"(({string}))", "{{" + string + "}}")
+    text = re.sub(r"\{(.*?)\}", r"**\1**", text)
+    text = re.sub(r"\(\((.*?)\)\)", r"{{\1}}", text)
 
     patt = re.compile(r"<view.*?>(.*?)</view>")
     for string in patt.findall(text):
@@ -339,16 +325,14 @@ def note(text: str | None, links: dict | None = None) -> str:
     patt = re.compile(r"<span(.*?)>")
     for string in patt.findall(text):
         text = patt.sub(f"[[span{string.replace("'", "\"")}]]", text, 1)
-    text = text.replace("</span>", "[[/span]]")
 
-    text = text.replace("<g>", '[[span class="group"]]').replace("</g>", "[[/span]]")
-
+    text = re.sub(r"</(g|span)>", "[[/span]]", text.replace("<g>", '[[span class="group"]]'))
     text = re.sub(r"\]\]$", "]] ", text)
 
     return text
 
 
-def tags_replace(types: str | None, quality: str | None) -> str:
+def tags_replace(types: str | None, quality: str | None, file_name: str) -> str:
     if types is None:
         types = ""
 
@@ -362,7 +346,7 @@ def tags_replace(types: str | None, quality: str | None) -> str:
     return f"{types} {quality} 物品"
 
 
-def add_one(target: dict):
+def add_one(target: dict, file_name: str):
     links: dict[str, list[str]] = {}
     locale: dict = target["locale"]
     tips = create_tips(locale.get("notes", locale.get("tips")), links) + "\n"
@@ -390,16 +374,16 @@ def add_one(target: dict):
         target["locale"].get("name", target["name"]),
         to_unix(target["name"]),
         source,
-        tags_replace(target["locale"]["type"], target["quality"]),
+        tags_replace(target["locale"]["type"], target["quality"], file_name),
     )
 
 
-def add_loop(table: dict):
+def add_loop(table: dict, file_name: str):
     with open("./output.ftml", "w", encoding="utf-8") as output:
         print("", file=output, end="")
 
     for target in table.values():
-        add_one(target)
+        add_one(target, file_name)
 
 
 def add_special(target: dict):
@@ -426,4 +410,4 @@ if __name__ == "__main__":
     """
     循环添加整个文件中的内容
     """
-    add_loop(data_dic["item"])
+    add_loop(data_dic["item"], "item.js")
