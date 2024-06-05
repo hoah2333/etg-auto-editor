@@ -301,6 +301,8 @@ def note(text: str | None, links: dict | None = None) -> str:
 
     text = info_note(text.replace("<br/>", "\n").replace("\n- ", "\n* "), links)
 
+    text = re.sub(r"(\| \w+ = )\- ", r"\1* ", text)
+
     for string in re.findall(r"<h\d>.*?</h\d>", text):
         num = int(string[2])
 
@@ -355,7 +357,7 @@ def tags_replace(types: str | None, quality: str | None) -> str:
     else:
         quality = f"枪械品质{quality}"
 
-    return f"{types} {quality} 枪械"
+    return f"{types} {quality} 物品"
 
 
 def add_one(target: dict):
@@ -417,9 +419,9 @@ if __name__ == "__main__":
     """
     添加某文件中的某个键的内容
     """
-    # add_one(data_dic["gun"]["Rusty Sidearm"])
+    add_one(data_dic["item"]["Prime Primer"])
 
     """
     循环添加整个文件中的内容
     """
-    add_loop(data_dic["gun"])
+    # add_loop(data_dic["gun"])
