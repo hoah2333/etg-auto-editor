@@ -147,6 +147,29 @@ def create_page(title: str, unix_name: str, source: str, tags: str):
                         break
             else:
                 logger.info("内容相同，跳过修改")
+            
+            for _ in range(1, 5):
+                try:
+                    page_id = site.page.get(unix_name).id
+
+                    site.amc_request(
+                        [
+                            {
+                                "action": "WikiPageAction",
+                                "event": "saveTags",
+                                "moduleName": "Empty",
+                                "tags": tags,
+                                "pageId": page_id,
+                            }
+                        ]
+                    )
+                    logger.info(f"{unix_name} 已修改标签")
+                except Exception as error:
+                    logger.error("标签修改失败，正在重试")
+                    logger.error(error)
+                    continue
+                else:
+                    break
             break
 
 
@@ -335,15 +358,26 @@ def note(text: str | None, links: dict | None = None, isInfo: bool = False) -> s
 def tags_replace(types: str | None, quality: str | None, file_name: str) -> str:
     if types is None:
         types = ""
+    match file_name:
+        case "gun":
+            tagtype = "枪械"
+        case "item":
+            tagtype = "道具"
+        case "chamber":
+            tagtype = "膛室"
+        case "chest":
+            tagtype = "宝箱"
+        case "enemy":
+            tagtype = "敌人"
+        case _:
+            tagtype = file_name
 
     if quality == "N" or quality is None:
-        quality = ""
-    elif quality == "DS":
-        quality = "枪械品质d 枪械品质s"
+        qualitytag = ""
     else:
-        quality = f"枪械品质{quality}"
-
-    return f"{types} {quality} 物品"
+        qualitytag = " ".join([f"{tagtype}品质{level}" for level in quality])
+        
+    return f"{types} {qualitytag} {tagtype}"
 
 
 def add_one(target: dict, file_name: str):
@@ -374,7 +408,7 @@ def add_one(target: dict, file_name: str):
         target["locale"].get("name", target["name"]),
         to_unix(target["name"]),
         source,
-        tags_replace(target["locale"]["type"], target["quality"], file_name),
+        tags_replace(target["locale"].get("type", ""), target.get("quality", ""), file_name),
     )
 
 
@@ -402,12 +436,14 @@ def add_special(target: dict):
 
 
 if __name__ == "__main__":
+    file = "enemy"
+
     """
     添加某文件中的某个键的内容
     """
-    # add_one(data_dic["item"]["Prime Primer"])
+    # add_one(data_dic[file]["Bullet King"], file)
 
     """
     循环添加整个文件中的内容
     """
-    add_loop(data_dic["item"], "item.js")
+    add_loop(data_dic[file], file)
