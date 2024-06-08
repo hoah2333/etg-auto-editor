@@ -31,17 +31,16 @@ for file in os.listdir("./data"):
             )
 
 def Retry(error_text: str, times: int = 5, ifRaise: bool = True):
-    def decorator(func: function):
+    def decorator(func):
         def wrapper(*args, **kwargs):
-            for _ in range(times):
+            for i in range(times):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
                     logger.error(error_text)
                     logger.error(e)
-            else:
-                if ifRaise:
-                    raise e
+                    if ifRaise and i == times - 1:
+                        raise e
         return wrapper
     return decorator
 
