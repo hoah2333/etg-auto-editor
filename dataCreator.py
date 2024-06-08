@@ -11,8 +11,9 @@ for target in file.values():
     locale = target["locale"]
     unix_name = to_unix(target["name"])
     if filename == "synergy":
-        links = {}
-        synergy = create_synergy(target["name"], links, True)
+        generator = Generator(target, "start")
+        add_args = generator.add_args
+        synergy = generator.create_synergy(target["name"], True)
         source = (
             f"[!-- {{${unix_name}}}\n"
             + synergy
@@ -44,7 +45,7 @@ for target in file.values():
                 "base_health", locale, "bosshealth" if filename == "boss" else "health"
             )
             + add_args("dps_cap", locale, "dps_cap")
-            + note(add_args("tips", locale, "tips"))
+            + generator.to_wikidot(add_args("tips", locale, "tips"))
             + "\n]]\n"
             + "[!-- --]\n"
         )
