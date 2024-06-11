@@ -204,7 +204,7 @@ class Generator:
             return ""
 
         return re.sub(
-            r"\[/(?=[^ ]*? [^ ]*?\][^\]])",
+            r"\[/(?=[^ ]*? [^ ]*?\])",
             "[/" if synergy else "[#u-",
             self.to_wikidot(text),
         ).replace("pickups#", "")

@@ -10,9 +10,9 @@ text = ""
 for target in file.values():
     locale = target["locale"]
     unix_name = to_unix(target["name"])
+    generator = Generator(target, "start")
+    add_args = generator.add_args
     if filename == "synergy":
-        generator = Generator(target, "start")
-        add_args = generator.add_args
         synergy = generator.create_synergy(target["name"], True)
         source = f"[!-- {{${unix_name}}}\n" + synergy + "[!-- --]\n"
     else:
