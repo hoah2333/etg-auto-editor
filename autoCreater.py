@@ -193,7 +193,7 @@ class Generator:
             return ""
 
         return re.sub(
-            r"\[/(?=.*?\])", "[/" if synergy else "[#u-", self.to_wikidot(text)
+            r"\[/(?=[^ ]*? [^ ]*?\][^\]])", "[/" if synergy else "[#u-", self.to_wikidot(text)
         ).replace("pickups#", "")
 
     def create_synergy(self, synergy: str, component: bool = False) -> str:
@@ -257,6 +257,8 @@ class Generator:
             name = data["locale"].get("name", data["name"])
 
             unix_name = to_unix(groups[1])
+            if string == "ENEMY:Shotgrub":
+                unix_name = "shotgrub-enemy"
             self.add_link(file, unix_name)
 
             if groups[0] == "PICKUP":
@@ -286,8 +288,7 @@ class Generator:
 
         patt = re.compile(r"\[(\[(\".*?\",?)+\],?)+\]")
         for string in patt.finditer(text):
-            print(string)
-            data = eval(string)
+            data = eval(string.group())
             repl = ""
             for line in data:
                 for unit in line:
@@ -297,6 +298,7 @@ class Generator:
                     repl += f"||{unit}"
                 repl += "||\n"
             text = patt.sub(repl, text, 1)
+        sub(r"<view(.*?)>(.*?)</view>", "[[span \g<1>]]\g<2>[[\\\span]]")
 
         patt = re.compile(r"<span(.*?)>")
         for string in patt.findall(text):
@@ -359,9 +361,13 @@ class Generator:
         with open("./output.ftml", "at", encoding="utf-8") as output:
             print(source, file=output, end="")
 
+        page_unix_name = to_unix(target["name"])
+        if page_unix_name == "shotgrub" and self.file_name == "enemy":
+            page_unix_name = "shotgrub-enemy"
+
         # create_page(
         #     target["locale"].get("name", target["name"]),
-        #     to_unix(target["name"]),
+        #     page_unix_name,
         #     source,
         #     self.tags_generate(
         #         target["locale"].get("type", ""), target.get("quality", "")
