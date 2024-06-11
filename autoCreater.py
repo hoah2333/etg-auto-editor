@@ -2,6 +2,7 @@ from collections import Counter
 import json
 import os
 import re
+from typing import Callable
 import wikidot
 import logging
 
@@ -30,8 +31,9 @@ for file in os.listdir("./data"):
                 f.read()[17:]
             )
 
+
 def Retry(error_text: str, times: int = 5, ifRaise: bool = True):
-    def decorator(func):
+    def decorator(func: Callable):
         def wrapper(*args, **kwargs):
             for i in range(times):
                 try:
@@ -41,8 +43,11 @@ def Retry(error_text: str, times: int = 5, ifRaise: bool = True):
                     logger.error(e)
                     if ifRaise and i == times - 1:
                         raise e
+
         return wrapper
+
     return decorator
+
 
 class create_page:
     @Retry("创建页面失败，正在重试")
@@ -100,10 +105,16 @@ class create_page:
                 unix_name = "pickups"
             case "achievement":
                 unix_name = "achievements"
-        self.unix_name, self.title, self.source, self.tags = unix_name, title, source, tags
+        self.unix_name, self.title, self.source, self.tags = (
+            unix_name,
+            title,
+            source,
+            tags,
+        )
         if (pagedata := site.page.get(unix_name, False)) is None:
             self.create_lock()
             self.create_new_page()
+            self.id = site.page.get(unix_name).id
         else:
             logger.info(f"{unix_name} 已存在")
             pagesource = pagedata.source.wiki_text
@@ -117,6 +128,7 @@ class create_page:
                 return
         self.edit_tags()
 
+
 def to_unix(string: str) -> str:
     """
     Converts string to unix name
@@ -129,6 +141,7 @@ def to_unix(string: str) -> str:
         "ammo-box"
     """
     return re.sub(r"[.'!&\-\\/\(\) ]+", "-", string.lower()).strip("-")
+
 
 class Generator:
     def add_args(self, key: str, item: dict[str, str], label: str) -> str:
@@ -209,7 +222,9 @@ class Generator:
         return (
             f"[[include component:{"preview-" if component else ""}synergy"
             + (f"\n| unix = {to_unix(synergy)}" if component else "")
-            + add_args("name", self.locale if "name" in self.locale else target, "title")
+            + add_args(
+                "name", self.locale if "name" in self.locale else target, "title"
+            )
             + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
             + crafts
             + add_args("sprite", target, "result")
@@ -217,15 +232,16 @@ class Generator:
             "\n]]\n"
         )
 
-
     def to_wikidot(self, text: str | None) -> str:
         if text is None:
             return ""
-        
+
         def replace(old, new):
+            nonlocal text
             text = text.replace(old, new)
-        
+
         def sub(patt, repl):
+            nonlocal text
             text = re.sub(patt, repl, text)
 
         replace("<br/>", "\n")
@@ -259,14 +275,18 @@ class Generator:
 
             text = text.replace(string, f"{'+'*num} {string[4:-5]}")
 
-        sub(r"\[\(~+(.*?)\)\]", r"[[image https://7bye.com/hoah/i/etg/\1]]",)
+        sub(
+            r"\[\(~+(.*?)\)\]",
+            r"[[image https://7bye.com/hoah/i/etg/\1]]",
+        )
         text = percent.sub("-", text)
         replace("-.", ".")
         sub(r"\{(.*?)\}", r"**\1**")
         sub(r"\(\((.*?)\)\)", r"{{\1}}")
 
-        patt = re.compile(r"<view.*?>(.*?)</view>")
-        for string in patt.findall(text):
+        patt = re.compile(r"\[(\[(\".*?\",?)+\],?)+\]")
+        for string in patt.finditer(text):
+            print(string)
             data = eval(string)
             repl = ""
             for line in data:
@@ -286,7 +306,6 @@ class Generator:
         sub(r"\]\]$", "]] ")
 
         return text
-
 
     def tags_generate(self, types: str | None, quality: str | None) -> str:
         if types is None:
@@ -309,9 +328,8 @@ class Generator:
             qualitytag = ""
         else:
             qualitytag = " ".join([f"{tagtype}品质{level}" for level in quality])
-            
-        return f"{types} {qualitytag} {tagtype}"
 
+        return f"{types} {qualitytag} {tagtype}"
 
     def __init__(self, target: dict, file_name: str):
         self.target, self.file_name = target, file_name
@@ -321,7 +339,7 @@ class Generator:
     def add_one(self):
         target, locale = self.target, self.locale
         tips = self.create_tips(locale.get("notes", locale.get("tips"))) + "\n"
-        infobox = self.create_infobox(target)
+        infobox = self.create_infobox()
         unlock = self.create_div_class("unlock", locale.get("unlock"))
         trivia = self.create_div_class("trivia", locale.get("trivia"))
 
@@ -338,15 +356,17 @@ class Generator:
 
         source = include + infobox + tips + synergies + unlock + trivia
 
-        with open("./output.ftml", "w", encoding="utf-8") as output:
+        with open("./output.ftml", "at", encoding="utf-8") as output:
             print(source, file=output, end="")
 
-        create_page(
-            target["locale"].get("name", target["name"]),
-            to_unix(target["name"]),
-            source,
-            self.tags_generate(target["locale"].get("type", ""), target.get("quality", "")),
-        )
+        # create_page(
+        #     target["locale"].get("name", target["name"]),
+        #     to_unix(target["name"]),
+        #     source,
+        #     self.tags_generate(
+        #         target["locale"].get("type", ""), target.get("quality", "")
+        #     ),
+        # )
 
 
 def add_loop(table: dict, file_name: str):
@@ -356,8 +376,9 @@ def add_loop(table: dict, file_name: str):
     for target in table.values():
         Generator(target, file_name).add_one()
 
+
 if __name__ == "__main__":
-    file = "enemy"
+    file = "room"
 
     """
     添加某文件中的某个键的内容

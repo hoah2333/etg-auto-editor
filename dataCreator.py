@@ -14,11 +14,7 @@ for target in file.values():
         generator = Generator(target, "start")
         add_args = generator.add_args
         synergy = generator.create_synergy(target["name"], True)
-        source = (
-            f"[!-- {{${unix_name}}}\n"
-            + synergy
-            + "[!-- --]\n"
-        )
+        source = f"[!-- {{${unix_name}}}\n" + synergy + "[!-- --]\n"
     else:
         source = (
             f"[!-- {{${unix_name}}}\n"
