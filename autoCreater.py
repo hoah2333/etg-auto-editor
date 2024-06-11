@@ -51,7 +51,7 @@ def Retry(error_text: str, times: int = 5, ifRaise: bool = True):
 
 class create_page:
     @Retry("创建页面失败，正在重试")
-    def create_new_page(self):
+    def create_new_page(self, ifEdit: bool = False):
         site.amc_request(
             [
                 {
@@ -64,11 +64,19 @@ class create_page:
                     "wiki_page": self.unix_name,
                     "lock_id": self.lock["lock_id"],
                     "lock_secret": self.lock["lock_secret"],
-                    "comments": f"自动新建页面：{self.title}",
+                    "comments": (
+                        f"自动新建页面：{self.title}"
+                        if ifEdit == False
+                        else f"Data corrected by AutoCreater"
+                    ),
                 }
             ]
         )
-        logger.info(f"{self.unix_name} 已创建")
+        logger.info(
+            f"{self.unix_name} 已创建"
+            if ifEdit == False
+            else f"{self.unix_name} 已修改"
+        )
 
     @Retry("标签添加失败，正在重试")
     def edit_tags(self):
@@ -122,11 +130,14 @@ class create_page:
                 self.title = pagedata.title
                 self.id = pagedata.id
                 self.create_lock()
-                self.create_new_page()
+                self.create_new_page(ifEdit=True)
             else:
                 logger.info("内容相同，跳过修改")
+                self.id = pagedata.id
+                self.edit_tags()
                 return
         self.edit_tags()
+
 
 
 def to_unix(string: str) -> str:
@@ -193,7 +204,9 @@ class Generator:
             return ""
 
         return re.sub(
-            r"\[/(?=[^ ]*? [^ ]*?\][^\]])", "[/" if synergy else "[#u-", self.to_wikidot(text)
+            r"\[/(?=[^ ]*? [^ ]*?\][^\]])",
+            "[/" if synergy else "[#u-",
+            self.to_wikidot(text),
         ).replace("pickups#", "")
 
     def create_synergy(self, synergy: str, component: bool = False) -> str:
@@ -298,7 +311,7 @@ class Generator:
                     repl += f"||{unit}"
                 repl += "||\n"
             text = patt.sub(repl, text, 1)
-        sub(r"<view(.*?)>(.*?)</view>", "[[span \g<1>]]\g<2>[[\\\span]]")
+        sub(r"<view(.*?)>(.*?)</view>", r"\[\[span \g<1>\]\]\g<2>\[\[/span\]\]")
 
         patt = re.compile(r"<span(.*?)>")
         for string in patt.findall(text):
@@ -323,6 +336,8 @@ class Generator:
                 tagtype = "宝箱"
             case "enemy":
                 tagtype = "敌人"
+            case "room":
+                tagtype = "房间"
             case other:
                 tagtype = other
 
@@ -365,14 +380,14 @@ class Generator:
         if page_unix_name == "shotgrub" and self.file_name == "enemy":
             page_unix_name = "shotgrub-enemy"
 
-        # create_page(
-        #     target["locale"].get("name", target["name"]),
-        #     page_unix_name,
-        #     source,
-        #     self.tags_generate(
-        #         target["locale"].get("type", ""), target.get("quality", "")
-        #     ),
-        # )
+        create_page(
+            target["locale"].get("name", target["name"]),
+            page_unix_name,
+            source,
+            self.tags_generate(
+                target["locale"].get("type", ""), target.get("quality", "")
+            ),
+        )
 
 
 def add_loop(table: dict, file_name: str):
@@ -384,7 +399,7 @@ def add_loop(table: dict, file_name: str):
 
 
 if __name__ == "__main__":
-    file = "room"
+    file = "boss"
 
     """
     添加某文件中的某个键的内容
