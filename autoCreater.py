@@ -204,10 +204,10 @@ class Generator:
             return ""
 
         return re.sub(
-            r"\[/(?=[^ ]*? [^ ]*?\])",
+            r"\[/(?=.*?\])",
             "[/" if synergy else "[#u-",
             self.to_wikidot(text),
-        ).replace("pickups#", "")
+        ).replace("pickups#", "").replace("#u-span", "/span")
 
     def create_synergy(self, synergy: str, component: bool = False) -> str:
         """
@@ -272,14 +272,15 @@ class Generator:
             unix_name = to_unix(groups[1])
             if string == "ENEMY:Shotgrub":
                 unix_name = "shotgrub-enemy"
-            self.add_link(file, unix_name)
 
             if groups[0] == "PICKUP":
                 repl = f"[/pickups#{unix_name} {name}]"
+                self.add_link(file, unix_name)
             elif groups[0] == "QUALITY":
                 repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
             else:
                 repl = f"[/{unix_name} {name}]"
+                self.add_link(file, unix_name)
 
             text = text.replace("{{" + string + "}}", repl)
 
@@ -409,4 +410,4 @@ if __name__ == "__main__":
     """
     循环添加整个文件中的内容
     """
-    add_loop(data_dic[file], file)
+    Generator(data_dic["npc"]["Bello"], "npc").add_one()
