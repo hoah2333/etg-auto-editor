@@ -250,7 +250,7 @@ class Generator:
         )
 
     def to_wikidot(self, text: str | None) -> str:
-        if text is None:
+        if text is None or text == "":
             return ""
 
         def replace(old, new):
@@ -303,8 +303,12 @@ class Generator:
             text = text.replace(string, f"{'+'*num} {string[4:-5]}")
 
         sub(
-            r"\[\(~+(.*?)\)\]",
+            r"\[\(!?~+(.*?)\)\]",
             r"[[image https://7bye.com/hoah/i/etg/\1]]",
+        )
+        sub(
+            r"\[\(#~+(.*?)\)\]",
+            r"[[image https://7bye.com/hoah/i/etg/\1_c.gif]]",
         )
         text = percent.sub("-", text)
         replace("-.", ".")
@@ -327,7 +331,7 @@ class Generator:
         patt = re.compile(r"\[(\[(\".*?\",?)+\],?)+\]")
         for string in patt.finditer(text):
             data = eval(string.group())
-            repl = ""
+            repl = "\n"
             for line in data:
                 for unit in line:
                     if unit[0] == "~":
@@ -340,7 +344,7 @@ class Generator:
         """
         Replace "<view foo>bar</view>" to "[[span foo]]bar[[/span]]"
         """
-        sub(r"<view(.*?)>(.*?)</view>", r"\[\[span \g<1>\]\]\g<2>\[\[/span\]\]")
+        text = re.sub(r"<view(.*?)>(.*?)</view>", r"[[span \1]]\2[[/span]]", text, flags=re.DOTALL)
 
         patt = re.compile(r"<span(.*?)>")
         for string in patt.findall(text):
@@ -367,6 +371,8 @@ class Generator:
                 tagtype = "敌人"
             case "room":
                 tagtype = "房间"
+            case "game_mode":
+                tagtype = "游戏模式"
             case other:
                 tagtype = other
 
@@ -441,15 +447,16 @@ def add_loop(table: dict, file_name: str, skip_key: str = None):
 
 
 if __name__ == "__main__":
-    file = "boss"
-    key = "Door Lord"
+    file = "game_mode"
+    key = "Challenge Mode"
 
     """
     添加某文件中的某个键的内容
     """
-    # add_one(data_dic[file][key], file)
+    # Generator(data_dic[file][key], file).add_one()
 
     """
     循环添加整个文件中的内容
     """
+    # add_loop(data_dic[file], file)
     add_loop(data_dic[file], file, key)

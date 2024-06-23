@@ -1,6 +1,6 @@
 from autoCreater import *
 
-filename = "boss"
+filename = "game-mode"
 
 with open(f"./data/{filename}.js", "r", encoding="utf-8") as f:
     file: dict = json.loads(f.read()[17:])
@@ -10,6 +10,12 @@ text = ""
 for target in file.values():
     locale = target["locale"]
     unix_name = to_unix(target["name"])
+    if filename == "enemy" and unix_name == "shotgrub":
+        unix_name = "shotgrub-enemy"
+    if filename == "boss" and unix_name == "resourceful-rat":
+        unix_name = "resourceful-rat-boss"
+    if filename == "boss" and unix_name == "blockner":
+        unix_name = "blockner-boss"
     generator = Generator(target, "start")
     add_args = generator.add_args
     if filename == "synergy":
@@ -26,7 +32,7 @@ for target in file.values():
                 "title",
             )
             + (f"\n| en-title = {target["name"]}" if "name" in locale else "")
-            + add_args("icon", target, "img")
+            + add_args("icon" if "icon" in target else "local_icon", target, "img")
             + add_args("type", locale, "type")
             + add_args("quality", target, "quality")
             + add_args("magazine_size", target, "clipsize")
