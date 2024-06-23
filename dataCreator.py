@@ -1,6 +1,6 @@
 from autoCreater import *
 
-filename = "game-mode"
+filename = "gun"
 
 with open(f"./data/{filename}.js", "r", encoding="utf-8") as f:
     file: dict = json.loads(f.read()[17:])

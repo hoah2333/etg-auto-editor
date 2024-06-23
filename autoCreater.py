@@ -6,11 +6,19 @@ from typing import Callable
 import wikidot
 import logging
 
+COLOR_RED = "\033[31m"
+COLOR_GREEN = "\033[32m"
+COLOR_YELLOW = "\033[33m"
+COLOR_BLUE = "\033[34m"
+COLOR_RESET = "\033[0m"
+
 logger = logging.getLogger("AutoCreater")
 logger.setLevel(logging.DEBUG)
 logger_handler = logging.StreamHandler()
 logger_handler.setFormatter(
-    logging.Formatter("%(asctime)s - %(name)s - %(levelname)s - %(message)s")
+    logging.Formatter(
+        f"{COLOR_YELLOW}%(asctime)s {COLOR_RESET}- {COLOR_YELLOW}%(name)s {COLOR_RESET}- {COLOR_BLUE}%(levelname)s {COLOR_RESET}- {COLOR_GREEN}%(message)s{COLOR_RESET}"
+    )
 )
 logger.addHandler(logger_handler)
 
@@ -50,7 +58,7 @@ def Retry(error_text: str, times: int = 5, ifRaise: bool = True):
 
 
 class create_page:
-    @Retry("创建页面失败，正在重试")
+    @Retry("创建页面失败，正在重试", ifRaise=False)
     def create_new_page(self, ifEdit: bool = False):
         site.amc_request(
             [
@@ -330,17 +338,20 @@ class Generator:
             repl = "\n"
             for line in data:
                 for unit in line:
-                    if unit[0] == "~":
+                    if unit and unit[0] == "~":
                         unit = "~ " + unit[1:]
-                    unit = unit.replace("\n", " _\n")
+                    unit = unit.replace("\n", " _\n").replace("\n- ", "\n* ")
                     repl += f"||{unit}"
                 repl += "||\n"
             text = patt.sub(repl, text, 1)
+        replace("||||", "|| ||")
 
         """
         Replace "<view foo>bar</view>" to "[[span foo]]bar[[/span]]"
         """
-        text = re.sub(r"<view(.*?)>(.*?)</view>", r"[[span \1]]\2[[/span]]", text, flags=re.DOTALL)
+        text = re.sub(
+            r"<view(.*?)>(.*?)</view>", r"[[span \1]]\2[[/span]]", text, flags=re.DOTALL
+        )
 
         """
         Replace "- " to "* "
@@ -448,16 +459,16 @@ def add_loop(table: dict, file_name: str, skip_key: str = None):
 
 
 if __name__ == "__main__":
-    file = "game_mode"
-    key = "Winchester's Game"
+    file = "gun"
+    key = "Com4nd0"
 
     """
     添加某文件中的某个键的内容
     """
-    Generator(data_dic[file][key], file).add_one()
+    # Generator(data_dic[file][key], file).add_one()
 
     """
     循环添加整个文件中的内容
     """
     # add_loop(data_dic[file], file)
-    # add_loop(data_dic[file], file, key)
+    add_loop(data_dic[file], file, key)
