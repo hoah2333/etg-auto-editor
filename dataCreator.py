@@ -20,7 +20,11 @@ for target in file.values():
             f"[!-- {{${unix_name}}}\n"
             + "[[include component:preview-box"
             + f"\n| unix = {unix_name}"
-            + add_args("name", target, "title")
+            + add_args(
+                "name",
+                locale if "name" in locale else target,
+                "title",
+            )
             + (f"\n| en-title = {target["name"]}" if "name" in locale else "")
             + add_args("icon", target, "img")
             + add_args("type", locale, "type")

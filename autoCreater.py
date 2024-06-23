@@ -66,16 +66,14 @@ class create_page:
                     "lock_secret": self.lock["lock_secret"],
                     "comments": (
                         f"自动新建页面：{self.title}"
-                        if ifEdit == False
+                        if not ifEdit
                         else f"Data corrected by AutoCreater"
                     ),
                 }
             ]
         )
         logger.info(
-            f"{self.unix_name} 已创建"
-            if ifEdit == False
-            else f"{self.unix_name} 已修改"
+            f"{self.unix_name} 已创建" if not ifEdit else f"{self.unix_name} 已修改"
         )
 
     @Retry("标签添加失败，正在重试")
@@ -93,7 +91,7 @@ class create_page:
         )
         logger.info(f"{self.unix_name} 已添加标签")
 
-    @Retry("")
+    @Retry("创建编辑锁失败，正在重试")
     def create_lock(self):
         self.lock = site.amc_request(
             [
@@ -125,19 +123,21 @@ class create_page:
             self.id = site.page.get(unix_name).id
         else:
             logger.info(f"{unix_name} 已存在")
-            pagesource = pagedata.source.wiki_text
-            if re.sub(r"[\r\n]", "", pagesource) != re.sub(r"[\r\n]", "", source):
+            repeat_patt = re.compile(r"[\r\n]|[ \n]$")
+
+            if repeat_patt.sub("", pagedata.source.wiki_text) != repeat_patt.sub(
+                "", source
+            ):
                 self.title = pagedata.title
                 self.id = pagedata.id
                 self.create_lock()
                 self.create_new_page(ifEdit=True)
             else:
-                logger.info("内容相同，跳过修改")
+                logger.info(f"{unix_name} 内容相同，跳过修改")
                 self.id = pagedata.id
                 self.edit_tags()
                 return
         self.edit_tags()
-
 
 
 def to_unix(string: str) -> str:
@@ -151,7 +151,7 @@ def to_unix(string: str) -> str:
         >>> to_unix("Ammo Box")
         "ammo-box"
     """
-    return re.sub(r"[.'!&\-\\/\(\) ]+", "-", string.lower()).strip("-")
+    return re.sub(r"[.'!&\-\\/\(\)\+ ]+", "-", string.lower()).strip("-")
 
 
 class Generator:
@@ -203,11 +203,15 @@ class Generator:
         if text is None:
             return ""
 
-        return re.sub(
-            r"\[/(?=.*?\])",
-            "[/" if synergy else "[#u-",
-            self.to_wikidot(text),
-        ).replace("pickups#", "").replace("#u-span", "/span")
+        return (
+            re.sub(
+                r"\[/(?=.*?\])",
+                "[/" if synergy else "[#u-",
+                self.to_wikidot(text),
+            )
+            .replace("pickups#", "")
+            .replace("#u-span", "/span")
+        )
 
     def create_synergy(self, synergy: str, component: bool = False) -> str:
         """
@@ -272,6 +276,10 @@ class Generator:
             unix_name = to_unix(groups[1])
             if string == "ENEMY:Shotgrub":
                 unix_name = "shotgrub-enemy"
+            if string == "BOSS:Resourceful Rat":
+                unix_name = "resourceful-rat-boss"
+            if string == "BOSS:Blockner":
+                unix_name = "blockner-boss"
 
             if groups[0] == "PICKUP":
                 repl = f"[/pickups#{unix_name} {name}]"
@@ -284,6 +292,9 @@ class Generator:
 
             text = text.replace("{{" + string + "}}", repl)
 
+        """
+        Replace "- " to "* "
+        """
         sub(r"(\| \w+ = )\- ", r"\1* ")
 
         for string in re.findall(r"<h\d>.*?</h\d>", text):
@@ -297,7 +308,20 @@ class Generator:
         )
         text = percent.sub("-", text)
         replace("-.", ".")
-        sub(r"\{(.*?)\}", r"**\1**")
+
+        """
+        Replace "/-" in image links to "/"
+        """
+        sub(r"(\/)\-", r"\1")
+
+        """
+        Replace "{foo}" to "**foo**"
+        """
+        sub(r"(?<!\{)\{([^{]*?)\}", r"**\1**")
+
+        """
+        Replace "((foo))" to "{{foo}}"
+        """
         sub(r"\(\((.*?)\)\)", r"{{\1}}")
 
         patt = re.compile(r"\[(\[(\".*?\",?)+\],?)+\]")
@@ -312,6 +336,10 @@ class Generator:
                     repl += f"||{unit}"
                 repl += "||\n"
             text = patt.sub(repl, text, 1)
+
+        """
+        Replace "<view foo>bar</view>" to "[[span foo]]bar[[/span]]"
+        """
         sub(r"<view(.*?)>(.*?)</view>", r"\[\[span \g<1>\]\]\g<2>\[\[/span\]\]")
 
         patt = re.compile(r"<span(.*?)>")
@@ -354,6 +382,7 @@ class Generator:
         self.links: dict[str, list[str]] = {}
         self.locale: dict = self.target["locale"]
 
+    @Retry("@add_one 运行失败，重试中")
     def add_one(self):
         target, locale = self.target, self.locale
         tips = self.create_tips(locale.get("notes", locale.get("tips"))) + "\n"
@@ -380,6 +409,10 @@ class Generator:
         page_unix_name = to_unix(target["name"])
         if page_unix_name == "shotgrub" and self.file_name == "enemy":
             page_unix_name = "shotgrub-enemy"
+        if page_unix_name == "resourceful-rat" and self.file_name == "boss":
+            page_unix_name = "resourceful-rat-boss"
+        if page_unix_name == "blockner" and self.file_name == "boss":
+            page_unix_name = "blockner-boss"
 
         create_page(
             target["locale"].get("name", target["name"]),
@@ -391,23 +424,32 @@ class Generator:
         )
 
 
-def add_loop(table: dict, file_name: str):
+def add_loop(table: dict, file_name: str, skip_key: str = None):
     with open("./output.ftml", "w", encoding="utf-8") as output:
         print("", file=output, end="")
 
+    skipped = True
+
     for target in table.values():
-        Generator(target, file_name).add_one()
+        if skip_key != None and target["name"] != skip_key and skipped:
+            logger.info(f"{target["name"]} 跳过修改")
+            continue
+        else:
+            skipped = False
+        if not skipped:
+            Generator(target, file_name).add_one()
 
 
 if __name__ == "__main__":
     file = "boss"
+    key = "Door Lord"
 
     """
     添加某文件中的某个键的内容
     """
-    # add_one(data_dic[file]["Bullet King"], file)
+    # add_one(data_dic[file][key], file)
 
     """
     循环添加整个文件中的内容
     """
-    Generator(data_dic["npc"]["Bello"], "npc").add_one()
+    add_loop(data_dic[file], file, key)
