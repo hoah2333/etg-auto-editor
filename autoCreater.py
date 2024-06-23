@@ -98,6 +98,7 @@ class create_page:
                 {
                     "mode": "page",
                     "wiki_page": self.unix_name,
+                    "force_lock": "yes",
                     "moduleName": "edit/PageEditModule",
                 }
             ]
@@ -292,11 +293,6 @@ class Generator:
 
             text = text.replace("{{" + string + "}}", repl)
 
-        """
-        Replace "- " to "* "
-        """
-        sub(r"(\| \w+ = )\- ", r"\1* ")
-
         for string in re.findall(r"<h\d>.*?</h\d>", text):
             num = int(string[2])
 
@@ -345,6 +341,11 @@ class Generator:
         Replace "<view foo>bar</view>" to "[[span foo]]bar[[/span]]"
         """
         text = re.sub(r"<view(.*?)>(.*?)</view>", r"[[span \1]]\2[[/span]]", text, flags=re.DOTALL)
+
+        """
+        Replace "- " to "* "
+        """
+        sub(r"(\| \w+ = )\- ", r"\1* ")
 
         patt = re.compile(r"<span(.*?)>")
         for string in patt.findall(text):
@@ -448,15 +449,15 @@ def add_loop(table: dict, file_name: str, skip_key: str = None):
 
 if __name__ == "__main__":
     file = "game_mode"
-    key = "Challenge Mode"
+    key = "Winchester's Game"
 
     """
     添加某文件中的某个键的内容
     """
-    # Generator(data_dic[file][key], file).add_one()
+    Generator(data_dic[file][key], file).add_one()
 
     """
     循环添加整个文件中的内容
     """
     # add_loop(data_dic[file], file)
-    add_loop(data_dic[file], file, key)
+    # add_loop(data_dic[file], file, key)
