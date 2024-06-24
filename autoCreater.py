@@ -352,9 +352,7 @@ class Generator:
         """
         Replace "<view foo>bar</view>" to "[[span foo]]bar[[/span]]"
         """
-        text = re.sub(
-            r"<view(.*?)>(.*?)</view>", r"[[span \1]]\2[[/span]]", text, flags=re.DOTALL
-        )
+        sub(r"<view([^>]*?)>", r"[[span \1]]")
 
         """
         Replace "- " to "* "
@@ -365,7 +363,7 @@ class Generator:
         for string in patt.findall(text):
             text = patt.sub(f"[[span{string.replace("'", "\"")}]]", text, 1)
         replace("<g>", '[[span class="group"]]')
-        sub(r"</(g|span)>", "[[/span]]")
+        sub(r"</(g|span|view)>", "[[/span]]")
         sub(r"\]\]$", "]] ")
 
         return text
