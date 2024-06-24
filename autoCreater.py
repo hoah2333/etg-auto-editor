@@ -244,12 +244,11 @@ class Generator:
                 self.add_link(file, unix_name)
                 text += f"[{"/" if component else "#u-"}{unix_name} {title}] "
             crafts += text
-
         return (
             f"[[include component:{"preview-" if component else ""}synergy"
             + (f"\n| unix = {to_unix(synergy)}" if component else "")
             + add_args(
-                "name", self.locale if "name" in self.locale else target, "title"
+                "name", target["locale"] if "name" in target["locale"] else target, "title"
             )
             + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
             + crafts
@@ -289,6 +288,10 @@ class Generator:
                 unix_name = "resourceful-rat-boss"
             if string == "BOSS:Blockner":
                 unix_name = "blockner-boss"
+            if string == "NPC:Winchester":
+                unix_name = "winchester-npc"
+            if string == "NPC:Grey Mauser":
+                unix_name = "grey-mauser-npc"
 
             if groups[0] == "PICKUP":
                 repl = f"[/pickups#{unix_name} {name}]"
@@ -385,6 +388,8 @@ class Generator:
                 tagtype = "房间"
             case "game_mode":
                 tagtype = "游戏模式"
+            case "gungeoneer":
+                tagtype = "角色"
             case other:
                 tagtype = other
 
@@ -425,12 +430,18 @@ class Generator:
             print(source, file=output, end="")
 
         page_unix_name = to_unix(target["name"])
-        if page_unix_name == "shotgrub" and self.file_name == "enemy":
-            page_unix_name = "shotgrub-enemy"
-        if page_unix_name == "resourceful-rat" and self.file_name == "boss":
-            page_unix_name = "resourceful-rat-boss"
-        if page_unix_name == "blockner" and self.file_name == "boss":
-            page_unix_name = "blockner-boss"
+        if (
+            (self.file_name == "enemy" and page_unix_name == "shotgrub")
+            or (
+                self.file_name == "boss"
+                and (page_unix_name == "resourceful-rat" or page_unix_name == "blockner")
+            )
+            or (
+                self.file_name == "npc"
+                and (page_unix_name == "winchester" or page_unix_name == "grey-mauser")
+            )
+        ):
+            page_unix_name = f"{unix_name}-{self.file_name}"
 
         create_page(
             target["locale"].get("name", target["name"]),
@@ -459,8 +470,8 @@ def add_loop(table: dict, file_name: str, skip_key: str = None):
 
 
 if __name__ == "__main__":
-    file = "gun"
-    key = "Com4nd0"
+    file = "gungeoneer"
+    key = "Hegemony Carbine"
 
     """
     添加某文件中的某个键的内容
@@ -470,5 +481,5 @@ if __name__ == "__main__":
     """
     循环添加整个文件中的内容
     """
-    # add_loop(data_dic[file], file)
-    add_loop(data_dic[file], file, key)
+    add_loop(data_dic[file], file)
+    # add_loop(data_dic[file], file, key)

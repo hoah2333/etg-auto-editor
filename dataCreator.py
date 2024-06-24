@@ -1,6 +1,6 @@
 from autoCreater import *
 
-filename = "gun"
+filename = "gungeoneer"
 
 with open(f"./data/{filename}.js", "r", encoding="utf-8") as f:
     file: dict = json.loads(f.read()[17:])
@@ -10,12 +10,18 @@ text = ""
 for target in file.values():
     locale = target["locale"]
     unix_name = to_unix(target["name"])
-    if filename == "enemy" and unix_name == "shotgrub":
-        unix_name = "shotgrub-enemy"
-    if filename == "boss" and unix_name == "resourceful-rat":
-        unix_name = "resourceful-rat-boss"
-    if filename == "boss" and unix_name == "blockner":
-        unix_name = "blockner-boss"
+    if (
+        (filename == "enemy" and unix_name == "shotgrub")
+        or (
+            filename == "boss"
+            and (unix_name == "resourceful-rat" or unix_name == "blockner")
+        )
+        or (
+            filename == "npc"
+            and (unix_name == "winchester" or unix_name == "grey-mauser")
+        )
+    ):
+        unix_name = f"{unix_name}-{filename}"
     generator = Generator(target, "start")
     add_args = generator.add_args
     if filename == "synergy":
