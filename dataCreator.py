@@ -1,6 +1,9 @@
 from autoCreater import *
 
-filename = "gungeoneer"
+with open("./createrinfo.json", "r", encoding="utf-8") as f:
+    createrinfo: dict = json.load(f)
+
+filename = createrinfo["file"]
 
 with open(f"./data/{filename}.js", "r", encoding="utf-8") as f:
     file: dict = json.loads(f.read()[17:])
@@ -20,6 +23,7 @@ for target in file.values():
             filename == "npc"
             and (unix_name == "winchester" or unix_name == "grey-mauser")
         )
+        or (filename == "shrine" and (unix_name == "junk" or unix_name == "beholster"))
     ):
         unix_name = f"{unix_name}-{filename}"
     generator = Generator(target, "start")

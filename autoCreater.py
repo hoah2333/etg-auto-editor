@@ -47,8 +47,8 @@ def Retry(error_text: str, times: int = 5, ifRaise: bool = True):
                 try:
                     return func(*args, **kwargs)
                 except Exception as e:
-                    logger.error(error_text)
-                    logger.error(e)
+                    logger.error(f"{COLOR_RED}{error_text}")
+                    logger.error(f"{COLOR_RED}{e}")
                     if ifRaise and i == times - 1:
                         raise e
 
@@ -132,7 +132,7 @@ class create_page:
             self.id = site.page.get(unix_name).id
         else:
             logger.info(f"{unix_name} 已存在")
-            repeat_patt = re.compile(r"[\r\n]|[ \n]$")
+            repeat_patt = re.compile(r"[\r\n]|[ \n]$|( \n)")
 
             if repeat_patt.sub("", pagedata.source.wiki_text) != repeat_patt.sub(
                 "", source
@@ -160,7 +160,7 @@ def to_unix(string: str) -> str:
         >>> to_unix("Ammo Box")
         "ammo-box"
     """
-    return re.sub(r"[.'!&\-\\/\(\)\+ ]+", "-", string.lower()).strip("-")
+    return re.sub(r"[,.'!&\-\\/\(\)\+ ]+", "-", string.lower()).strip("-")
 
 
 class Generator:
@@ -204,7 +204,10 @@ class Generator:
             + add_args("force", target, "force")
             + add_args("spread", target, "spread")
             + add_args("sell", target, "sell")
-            + add_args("unlock", locale, "unlock")
+            + add_args(
+                "base_health", locale, "bosshealth" if self.file_name == "boss" else "health"
+            )
+            + add_args("dps_cap", locale, "dps_cap")
             + "\n]]\n"
         )
 
@@ -248,7 +251,9 @@ class Generator:
             f"[[include component:{"preview-" if component else ""}synergy"
             + (f"\n| unix = {to_unix(synergy)}" if component else "")
             + add_args(
-                "name", target["locale"] if "name" in target["locale"] else target, "title"
+                "name",
+                target["locale"] if "name" in target["locale"] else target,
+                "title",
             )
             + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
             + crafts
@@ -292,6 +297,18 @@ class Generator:
                 unix_name = "winchester-npc"
             if string == "NPC:Grey Mauser":
                 unix_name = "grey-mauser-npc"
+            if string == "SHRINE:Junk":
+                unix_name = "junk-shrine"
+            if string == "SHRINE:Beholster":
+                unix_name = "beholster-shrine"
+            if string == "SHRINE:Companion":
+                unix_name = "companion-shrine"
+            if string == "SYSTEM:Pickup":
+                unix_name = "pickups"
+            if string == "SYSTEM:Brick of Cash":
+                unix_name = "brick-of-cash-system"
+            if string == "SYSTEM:Bullet Kin":
+                unix_name = "bullet-kin-system"
 
             if groups[0] == "PICKUP":
                 repl = f"[/pickups#{unix_name} {name}]"
@@ -364,7 +381,11 @@ class Generator:
             text = patt.sub(f"[[span{string.replace("'", "\"")}]]", text, 1)
         replace("<g>", '[[span class="group"]]')
         sub(r"</(g|span|view)>", "[[/span]]")
-        sub(r"\]\]$", "]] ")
+        sub(r"\]\] ?\n|\]\] ?$", "]] _\n")
+
+        sub("<hr/>", "----")
+        replace("[[span ]]", "[[span]]")
+        sub(r"\n+ _", "\n _")
 
         return text
 
@@ -388,8 +409,19 @@ class Generator:
                 tagtype = "游戏模式"
             case "gungeoneer":
                 tagtype = "角色"
+            case "page":
+                tagtype = "杂项"
+            case "pickup":
+                tagtype = "掉落物"
+            case "shrine":
+                tagtype = "雕像"
+            case "system":
+                tagtype = "系统"
             case other:
                 tagtype = other
+
+        if self.target["name"] == "The Breach":
+            tagtype = "房间 杂项"
 
         if quality == "N" or quality is None:
             qualitytag = ""
@@ -408,7 +440,7 @@ class Generator:
         target, locale = self.target, self.locale
         tips = self.create_tips(locale.get("notes", locale.get("tips"))) + "\n"
         infobox = self.create_infobox()
-        unlock = self.create_div_class("unlock", locale.get("unlock"))
+        unlock = self.create_div_class("unlock", locale.get("unlock") if "unlock" in locale else target.get("unlock"))
         trivia = self.create_div_class("trivia", locale.get("trivia"))
 
         synergies = ""
@@ -432,14 +464,30 @@ class Generator:
             (self.file_name == "enemy" and page_unix_name == "shotgrub")
             or (
                 self.file_name == "boss"
-                and (page_unix_name == "resourceful-rat" or page_unix_name == "blockner")
+                and (
+                    page_unix_name == "resourceful-rat" or page_unix_name == "blockner"
+                )
             )
             or (
                 self.file_name == "npc"
                 and (page_unix_name == "winchester" or page_unix_name == "grey-mauser")
             )
+            or (
+                self.file_name == "shrine"
+                and (
+                    page_unix_name == "junk"
+                    or page_unix_name == "beholster"
+                    or page_unix_name == "companion"
+                )
+            )
+            or (
+                self.file_name == "system"
+                and (
+                    page_unix_name == "brick-of-cash" or page_unix_name == "bullet-kin"
+                )
+            )
         ):
-            page_unix_name = f"{unix_name}-{self.file_name}"
+            page_unix_name = f"{page_unix_name}-{self.file_name}"
 
         create_page(
             target["locale"].get("name", target["name"]),
@@ -468,16 +516,25 @@ def add_loop(table: dict, file_name: str, skip_key: str = None):
 
 
 if __name__ == "__main__":
-    file = "gungeoneer"
-    key = "Hegemony Carbine"
+    with open("./createrinfo.json", "r", encoding="utf-8") as f:
+        createrinfo: dict = json.load(f)
 
-    """
-    添加某文件中的某个键的内容
-    """
-    # Generator(data_dic[file][key], file).add_one()
+    file = createrinfo["file"]
+    key = createrinfo["key"]
 
-    """
-    循环添加整个文件中的内容
-    """
-    add_loop(data_dic[file], file)
-    # add_loop(data_dic[file], file, key)
+    match createrinfo["creater_mode"]:
+        case 0:
+            """
+            添加某文件中的某个键的内容
+            """
+            Generator(data_dic[file][key], file).add_one()
+        case 1:
+            """
+            从头开始循环添加整个文件中的内容
+            """
+            add_loop(data_dic[file], file)
+        case 2:
+            """
+            从指定键值开始循环添加整个文件中的内容
+            """
+            add_loop(data_dic[file], file, key)
