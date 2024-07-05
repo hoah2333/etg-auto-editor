@@ -180,7 +180,7 @@ class Generator:
         if element is None:
             return ""
 
-        return f'[[div_ class="{name}"]]\n' + self.create_tips(element) + "\n[[/div]]\n"
+        return f'[[div_ class="{name}"]]\n' + self.to_wikidot(element, False) + "\n[[/div]]\n"
 
     def create_infobox(self) -> str:
         target, locale, add_args = self.target, self.locale, self.add_args
@@ -209,20 +209,6 @@ class Generator:
             )
             + add_args("dps_cap", locale, "dps_cap")
             + "\n]]\n"
-        )
-
-    def create_tips(self, text: str | None, synergy: bool = False) -> str:
-        if text is None:
-            return ""
-
-        return (
-            re.sub(
-                r"\[/(?=.*?\])",
-                "[/" if synergy else "[#u-",
-                self.to_wikidot(text),
-            )
-            .replace("pickups#", "")
-            .replace("#u-span", "/span")
         )
 
     def create_synergy(self, synergy: str, component: bool = False) -> str:
@@ -258,11 +244,11 @@ class Generator:
             + (f"\n| en-title = {target["name"]}" if "name" in target["locale"] else "")
             + crafts
             + add_args("sprite", target, "result")
-            + f"\n| tips = {self.create_tips(target["locale"].get("tips"), component)}"
+            + f"\n| tips = {self.to_wikidot(target["locale"].get("tips"), component)}"
             "\n]]\n"
         )
 
-    def to_wikidot(self, text: str | None) -> str:
+    def to_wikidot(self, text: str | None, synergy: bool = True) -> str:
         if text is None or text == "":
             return ""
 
@@ -310,13 +296,20 @@ class Generator:
             if string == "SYSTEM:Bullet Kin":
                 unix_name = "bullet-kin-system"
 
-            if groups[0] == "PICKUP":
-                repl = f"[/pickups#{unix_name} {name}]"
-                self.add_link(file, unix_name)
-            elif groups[0] == "QUALITY":
+            if groups[0] == "QUALITY":
                 repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
             else:
-                repl = f"[/{unix_name} {name}]"
+                if synergy:
+                    repl = f"[[a href=/\"{"pickups#" if groups[0] == "PICKUP" else ""}{unix_name}\""
+                else:
+                    repl = f"[[a href=\"#u-{unix_name}\""
+                if "icon" in data:
+                    repl_part = f"{" class=\"synergy\"" if groups[0] == "SYNERGY" else ""}]][[image https://7bye.com/hoah/i/etg/{data["icon"]}]][[/a]]"
+                elif "local_icon" in data:
+                    repl_part = f"{" class=\"synergy\"" if groups[0] == "SYNERGY" else ""}]][[image https://7bye.com/hoah/i/etg/{data["local_icon"]}]][[/a]]"
+                else:
+                    repl_part = f" class=\"link\"]]{name}[[/a]]"
+                repl += repl_part
                 self.add_link(file, unix_name)
 
             text = text.replace("{{" + string + "}}", repl)
@@ -438,7 +431,7 @@ class Generator:
     @Retry("@add_one 运行失败，重试中")
     def add_one(self):
         target, locale = self.target, self.locale
-        tips = self.create_tips(locale.get("notes", locale.get("tips"))) + "\n"
+        tips = self.to_wikidot(locale.get("notes", locale.get("tips")), False) + "\n"
         infobox = self.create_infobox()
         unlock = self.create_div_class("unlock", locale.get("unlock") if "unlock" in locale else target.get("unlock"))
         trivia = self.create_div_class("trivia", locale.get("trivia"))
