@@ -12,6 +12,8 @@ COLOR_YELLOW = "\033[33m"
 COLOR_BLUE = "\033[34m"
 COLOR_RESET = "\033[0m"
 
+IMG_SERVER = "https://7bye.com/hoah/i/etg"
+
 logger = logging.getLogger("AutoCreater")
 logger.setLevel(logging.DEBUG)
 logger_handler = logging.StreamHandler()
@@ -180,7 +182,11 @@ class Generator:
         if element is None:
             return ""
 
-        return f'[[div_ class="{name}"]]\n' + self.to_wikidot(element, False) + "\n[[/div]]\n"
+        return (
+            f'[[div_ class="{name}"]]\n'
+            + self.to_wikidot(element, False)
+            + "\n[[/div]]\n"
+        )
 
     def create_infobox(self) -> str:
         target, locale, add_args = self.target, self.locale, self.add_args
@@ -205,7 +211,9 @@ class Generator:
             + add_args("spread", target, "spread")
             + add_args("sell", target, "sell")
             + add_args(
-                "base_health", locale, "bosshealth" if self.file_name == "boss" else "health"
+                "base_health",
+                locale,
+                "bosshealth" if self.file_name == "boss" else "health",
             )
             + add_args("dps_cap", locale, "dps_cap")
             + "\n]]\n"
@@ -229,9 +237,17 @@ class Generator:
                 name = item["name"]
                 unix_name = to_unix(name)
                 item_target = data_dic[file][name]
-                title = item_target["locale"].get("name", item_target["name"])
                 self.add_link(file, unix_name)
-                text += f"[{"/" if component else "#u-"}{unix_name} {title}] "
+                text += f'[[a href="{"/" if component else "#u-"}{unix_name}"]]'
+                if "icon" in item_target:
+                    text += f'[[image {IMG_SERVER}/{item_target["icon"]}]][[/a]] '
+                elif "local_icon" in item_target:
+                    text += f'[[image {IMG_SERVER}/{item_target["local_icon"]}]][[/a]] '
+                else:
+                    text += f'{item_target["locale"].get("name", item_target["name"])}[[/a]]'
+                text = percent.sub("-", text)
+                text = text.replace("-.", ".")
+                text = re.sub(r"(\/)\-", r"\1", text)
             crafts += text
         return (
             f"[[include component:{"preview-" if component else ""}synergy"
@@ -264,6 +280,49 @@ class Generator:
         replace("\n- ", "\n* ")
         sub(r"(\r\n)+", "\n")
         replace("}}{{", "}} {{")
+
+        for string in re.findall(r"<h\d>.*?</h\d>", text):
+            num = int(string[2])
+
+            text = text.replace(string, f"{'+'*num} {string[4:-5]}")
+
+        for string in re.findall(r"\[\((.*?)\)\]", text):
+            if string[0] == "#":
+                repl = f'[[image {IMG_SERVER}/{string[(2 if string[1] == "~" else 1):]}_c.gif class="media"]]'
+            elif string[0] == "!":
+                repl = f'[[image {IMG_SERVER}/{"" if string[1] == "~" else "data/"}{string[(2 if string[1] == "~" else 1):]} class="icon"]]'
+            elif string[0:2] == "~~":
+                repl = f'[[image {IMG_SERVER}/{string[2:]} class="icon"]]'
+            elif string[0] == "~":
+                repl = f"[[image {IMG_SERVER}/{string[1:]}]]"
+            else:
+                repl = f"[({string})]"
+            replace(f"[({string})]", repl)
+
+        """
+        Replace "{foo}" to "**foo**"
+        """
+        sub(r"(?<!\{)\{([^{]*?)\}", r"**\1**")
+
+        """
+        Replace "((foo))" to "{{foo}}"
+        """
+        sub(r"\(\((.*?)\)\)", r"{{\1}}")
+
+        patt = re.compile(r"\[(\[(\".*?\",?)+\],?)+\]")
+        for string in patt.finditer(text):
+            data = eval(string.group())
+            repl = "\n"
+            for line in data:
+                for unit in line:
+                    if unit and unit[0] == "~":
+                        unit = "~ " + unit[1:]
+                    unit = unit.replace("\n", " _\n").replace("\n- ", "\n* ")
+                    repl += f"||{unit}"
+                repl += "||\n"
+            text = patt.sub(repl, text, 1)
+        replace("||||", "|| ||")
+
         for string in re.findall(r"\{\{(.*?)\}\}", text):
             if len(groups := re.split(r":", string)) != 2:
                 continue
@@ -297,36 +356,23 @@ class Generator:
                 unix_name = "bullet-kin-system"
 
             if groups[0] == "QUALITY":
-                repl = f"[[image https://7bye.com/hoah/i/etg/{data['local_icon']}]]"
+                repl = f"[[image {IMG_SERVER}/{data['local_icon']}]]"
             else:
                 if synergy:
-                    repl = f"[[a href=/\"{"pickups#" if groups[0] == "PICKUP" else ""}{unix_name}\""
+                    repl = f'[[a href="/{"pickups#" if groups[0] == "PICKUP" else ""}{unix_name}"'
                 else:
-                    repl = f"[[a href=\"#u-{unix_name}\""
+                    repl = f'[[a href="#u-{unix_name}"'
                 if "icon" in data:
-                    repl_part = f"{" class=\"synergy\"" if groups[0] == "SYNERGY" else ""}]][[image https://7bye.com/hoah/i/etg/{data["icon"]}]][[/a]]"
+                    repl_part = f"]][[image {IMG_SERVER}/{data["icon"]}]][[/a]]"
                 elif "local_icon" in data:
-                    repl_part = f"{" class=\"synergy\"" if groups[0] == "SYNERGY" else ""}]][[image https://7bye.com/hoah/i/etg/{data["local_icon"]}]][[/a]]"
+                    repl_part = f"]][[image {IMG_SERVER}/{data["local_icon"]}]][[/a]]"
                 else:
-                    repl_part = f" class=\"link\"]]{name}[[/a]]"
+                    repl_part = f' class="{"synergy" if groups[0] == "SYNERGY" else "link"}"]]{name}[[/a]]'
                 repl += repl_part
                 self.add_link(file, unix_name)
 
             text = text.replace("{{" + string + "}}", repl)
 
-        for string in re.findall(r"<h\d>.*?</h\d>", text):
-            num = int(string[2])
-
-            text = text.replace(string, f"{'+'*num} {string[4:-5]}")
-
-        sub(
-            r"\[\(!?~+(.*?)\)\]",
-            r"[[image https://7bye.com/hoah/i/etg/\1]]",
-        )
-        sub(
-            r"\[\(#~+(.*?)\)\]",
-            r"[[image https://7bye.com/hoah/i/etg/\1_c.gif]]",
-        )
         text = percent.sub("-", text)
         replace("-.", ".")
 
@@ -334,30 +380,6 @@ class Generator:
         Replace "/-" in image links to "/"
         """
         sub(r"(\/)\-", r"\1")
-
-        """
-        Replace "{foo}" to "**foo**"
-        """
-        sub(r"(?<!\{)\{([^{]*?)\}", r"**\1**")
-
-        """
-        Replace "((foo))" to "{{foo}}"
-        """
-        sub(r"\(\((.*?)\)\)", r"{{\1}}")
-
-        patt = re.compile(r"\[(\[(\".*?\",?)+\],?)+\]")
-        for string in patt.finditer(text):
-            data = eval(string.group())
-            repl = "\n"
-            for line in data:
-                for unit in line:
-                    if unit and unit[0] == "~":
-                        unit = "~ " + unit[1:]
-                    unit = unit.replace("\n", " _\n").replace("\n- ", "\n* ")
-                    repl += f"||{unit}"
-                repl += "||\n"
-            text = patt.sub(repl, text, 1)
-        replace("||||", "|| ||")
 
         """
         Replace "<view foo>bar</view>" to "[[span foo]]bar[[/span]]"
@@ -379,6 +401,9 @@ class Generator:
         sub("<hr/>", "----")
         replace("[[span ]]", "[[span]]")
         sub(r"\n+ _", "\n _")
+        replace(" _\n* ", " _\n\n* ")
+        replace(" _\n||", "\n||")
+        replace("\\n", "\n")
 
         return text
 
@@ -433,7 +458,10 @@ class Generator:
         target, locale = self.target, self.locale
         tips = self.to_wikidot(locale.get("notes", locale.get("tips")), False) + "\n"
         infobox = self.create_infobox()
-        unlock = self.create_div_class("unlock", locale.get("unlock") if "unlock" in locale else target.get("unlock"))
+        unlock = self.create_div_class(
+            "unlock",
+            locale.get("unlock") if "unlock" in locale else target.get("unlock"),
+        )
         trivia = self.create_div_class("trivia", locale.get("trivia"))
 
         synergies = ""

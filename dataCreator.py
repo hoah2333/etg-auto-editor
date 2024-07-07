@@ -62,6 +62,11 @@ for target in file.values():
             )
             + add_args("dps_cap", locale, "dps_cap")
             + generator.to_wikidot(add_args("tips", locale, "tips"))
+            + (
+                "\nnodetail = true\n"
+                if filename == "synergy" or filename == "pickup"
+                else ""
+            )
             + "\n]]\n"
             + "[!-- --]\n"
         )
