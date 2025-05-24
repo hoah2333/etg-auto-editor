@@ -30,7 +30,7 @@ with open("./logininfo.json", "r", encoding="utf-8") as f:
 wd = wikidot.Client(logininfo["username"], logininfo["password"])
 site = wd.site.get("etg-xd")
 logger.info("登录成功")
-data_dic: dict[str, dict] = {}
+data_dic: dict[str, dict[str, str]] = {}
 percent = re.compile(r"%[0-9]{2}")
 
 
